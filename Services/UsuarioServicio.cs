@@ -16,12 +16,26 @@ namespace RaccoonMobile.Services
         }
         public Usuario IniciarSesion(string email, string password)
         {
-            throw new NotImplementedException();
+            if (usuarios.Count == 0)
+            {
+                return null;
+            }
+            else
+            {
+                return usuarios.Find(u => u.Email == email && u.Password == password);
+            }
         }
 
         public bool RegistrarUsuario(Usuario usuario)
         {
-            throw new NotImplementedException();
+            if (usuarios.Any(u => u.Email == usuario.Email))
+            {
+                return false;
+            }
+            usuario.Id = usuarios.Count  + 1;
+            usuarios.Add(usuario);
+            return true;
         }
+
     }
 }
