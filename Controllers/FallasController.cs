@@ -88,5 +88,10 @@ namespace RaccoonMobile.Controllers
                 return Json(new { message = "Fallo no encontrado" });
             }
         }
+
+        public IActionResult User()
+        {
+            return View();
+        }
     }
 }
