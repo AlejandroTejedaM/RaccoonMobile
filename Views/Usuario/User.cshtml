@@ -1,0 +1,123 @@
+@{
+    ViewData["Title"] = "Problemas de usuarios";
+}
+
+<div class="container my-4">
+    <h1 class="mb-3">Reporte de Fallo en Línea</h1>
+    <p>
+        Bienvenido(a) a Raccoon Mobile y Asociados, la empresa de telefonía más confiable de México.
+        Sabemos lo importante que es mantenerte conectado(a), por eso ofrecemos atención rápida y seguimiento en tiempo real para resolver cualquier inconveniente que puedas tener con tu línea.
+        A continuación, detectaremos automáticamente tu ubicación para asistirte mejor. Después, podrás describir el problema que estás experimentando y lo notificaremos de inmediato.
+    </p>
+
+    <div class="alert alert-info" id="location-status">Detectando ubicación...</div>
+
+    <h3>Selecciona tu ubicación</h3>
+    <!-- Contenedor para el mapa -->
+    <div id="map-container" style="position: relative; width: 800px; height: 800px; margin: 0 auto;">
+        <div id="map" style="height: 20%;"></div>
+    </div>  
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        let map = L.map('map').setView([51.505, -0.09], 13);
+
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+
+        let userLocation = {};
+        let marker;
+
+        // Detección de ubicación geográfica
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((position) => {
+                userLocation = {
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude
+                };
+                document.getElementById('location-status').textContent = 
+                    `Ubicación detectada: Latitud ${userLocation.latitude}, Longitud ${userLocation.longitude}`;
+                map.setView([userLocation.latitude, userLocation.longitude], 13);
+                marker = L.marker([userLocation.latitude, userLocation.longitude]).addTo(map)
+                    .bindPopup('Estás aquí')
+                    .openPopup();
+            }, (error) => {
+                document.getElementById('location-status').textContent = 
+                    "No se pudo detectar la ubicación. Por favor, activa la geolocalización en tu navegador.";
+            });
+        } else {
+            document.getElementById('location-status').textContent = 
+                "La geolocalización no es soportada por este navegador.";
+        }
+
+        // Función para seleccionar la ubicación en el mapa
+        function onMapClick(e) {
+            if (marker) {
+                map.removeLayer(marker); // Remover el marcador anterior
+            }
+            userLocation = {
+                latitude: e.latlng.lat,
+                longitude: e.latlng.lng
+            };
+            marker = L.marker(e.latlng).addTo(map)
+                .bindPopup('Ubicación seleccionada')
+                .openPopup();
+            document.getElementById('location-status').textContent = 
+                `Ubicación seleccionada: Latitud ${userLocation.latitude}, Longitud ${userLocation.longitude}`;
+        }
+
+        map.on('click', onMapClick);
+    </script>
+
+    <!-- Campo para la descripción del fallo -->
+    <div class="mb-3" style="margin-top: 20px;"> <!-- Ajuste para evitar superposición con el mapa -->
+        <label for="issueDescription" class="form-label">Describe el problema que estás experimentando:</label>
+        <textarea class="form-control" id="issueDescription" rows="3"></textarea>
+    </div>
+    
+    <!-- Botón para enviar la notificación -->
+    <button id="sendNotification" class="btn btn-primary">Enviar Notificación</button>
+
+    <!-- Mensaje de éxito o error -->
+    <div class="mt-3" id="responseMessage"></div>
+</div>
+
+<script>
+    // Función para enviar los datos del fallo
+    document.getElementById('sendNotification').addEventListener('click', () => {
+        const issueDescription = document.getElementById('issueDescription').value;
+        
+        if (!issueDescription) {
+            document.getElementById('responseMessage').innerHTML = 
+                '<div class="alert alert-danger">Por favor, ingresa la descripción del problema correctamente.</div>';
+            return;
+        }
+
+        // Simular el envío de los datos a una API (aquí sustituir por la URL de la API real)
+        const apiUrl = '/api/notifications';  // Ejemplo de URL de API
+
+        const notificationData = {
+            location: userLocation,
+            description: issueDescription
+        };
+
+        fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(notificationData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('responseMessage').innerHTML = 
+                '<div class="alert alert-success">¡Notificación enviada exitosamente!</div>';
+        })
+        .catch(error => {
+            document.getElementById('responseMessage').innerHTML = 
+                '<div class="alert alert-danger">Hubo un error al enviar la notificación. Inténtalo nuevamente.</div>';
+        });
+    });
+</script>
