@@ -11,6 +11,7 @@
         html,
         body {
             height: 100%;
+            margin: 0; /* Agregar margen 0 para evitar scroll innecesario */
         }
 
         body {
@@ -20,6 +21,7 @@
 
         main {
             flex: 1;
+            margin-bottom: 1rem; /* Espacio para el footer */
         }
 
         .navbar-brand {
@@ -45,9 +47,8 @@
             background-color: #333333;
             color: #ffffff;
             padding: 1rem 0;
-            position: sticky;
-            bottom: 0;
             width: 100%;
+            /* Remover position: sticky */
         }
 
         .footer a {
@@ -88,7 +89,7 @@
         @RenderBody()
     </main>
 
-    <footer class="footer mt-auto text-center">
+    <footer class="footer text-center">
         <div class="container">
             &copy; 2024 - Raccoon Mobile y Asociados
         </div>
