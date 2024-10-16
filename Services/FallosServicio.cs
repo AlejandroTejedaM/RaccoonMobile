@@ -69,7 +69,17 @@ namespace RaccoonMobile.Services
             {
                 throw new ArgumentNullException(nameof(fallo));
             }
-            fallos.Add(fallo);
+            Fallo ultimoFallo = ObtenerFallo(fallos.Count);
+            if (ultimoFallo == null)
+            {
+                fallo.id = 1;
+                fallos.Add(fallo);
+            }
+            else
+            {
+                fallo.id = ultimoFallo.id + 1;
+                fallos.Add(fallo);
+            }
             return fallo;
         }
     }

@@ -1,125 +1,155 @@
 @{
-    ViewData["Title"] = "Problemas de usuarios";
+ViewData["Title"] = "Reporte de Fallo";
 }
 
 <div class="container my-4">
     <h1 class="mb-3">Reporte de Fallo en Línea</h1>
     <p>
-        Bienvenido(a) a Raccoon Mobile y Asociados, la empresa de telefonía más confiable de México.
-        Sabemos lo importante que es mantenerte conectado(a), por eso ofrecemos atención rápida y seguimiento en tiempo
-        real para resolver cualquier inconveniente que puedas tener con tu línea.
-        A continuación, detectaremos automáticamente tu ubicación para asistirte mejor. Después, podrás describir el
-        problema que estás experimentando y lo notificaremos de inmediato.
+        Bienvenido(a) a Raccoon Mobile y Asociados. Por favor, reporte cualquier problema con su línea a continuación.
     </p>
 
-    <div class="alert alert-info" id="location-status">Detectando ubicación...</div>
+    <div class="row">
+        <div class="col-8">
+            <div class="alert alert-info" role="alert">
+                <strong>Ubicación:</strong> <span id="location-status">Detectando ubicación...</span>
+            </div>
+        </div>
+        <div id="UbicacionOriginal" class="col-4">
+            <button class="btn btn-primary" onclick="updateMap(originalLocation)">Restaurar Ubicación</button>
+        </div>
+    </div>    
+    <div id="map" style="width: 100%; height: 400px; margin-bottom: 20px;"></div>
 
-    <h3>Selecciona tu ubicación</h3>
+    <form id="falloForm">
+        <div class="mb-3">
+            <label for="usuario" class="form-label">Nombre de Usuario</label>
+            <input type="text" class="form-control" id="usuario" required>
+        </div>
+        <div class="mb-3">
+            <label for="descripcion" class="form-label">Descripción del Problema</label>
+            <textarea class="form-control" id="descripcion" rows="3" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Enviar Reporte</button>
+    </form>
 
-    <!-- Div para el mapa de Leaflet -->
-    <div id="map" style="width: 100%; height: 500px;"></div>
-
-    <!-- Botón para volver a la ubicación original -->
-    <button id="resetLocation" class="btn btn-secondary" style="margin-top: 10px; margin-bottom: 10px;">Volver a mi ubicación</button>
-
-    <!-- Campo para la descripción del fallo -->
-    <div class="mb-3" style="margin-top: 20px;">
-        <label for="issueDescription" class="form-label">Describe el problema que estás experimentando:</label>
-        <textarea class="form-control" id="issueDescription" rows="3"></textarea>
-    </div>
-
-    <!-- Botón para enviar la notificación -->
-    <button id="sendNotification" class="btn btn-primary">Enviar Notificación</button>
-
-    <!-- Mensaje de éxito o error -->
-    <div class="mt-3" id="responseMessage"></div>
+    <div id="responseMessage" class="mt-3"></div>
 </div>
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-
+@section Scripts {
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+<script src="js/signalr.min.js"></script>
 <script>
+    let map, marker, userLocation;
     let originalLocation = {};
-    let userLocation = {};
-    let map, marker;
 
-    // Función para detectar la ubicación geográfica
-    function detectUserLocation() {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition((position) => {
-                userLocation = {
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude
-                };
+    function initMap() {
+        map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+    }
 
-                // Guardar la ubicación original
-                originalLocation = { ...userLocation };
+    function detectLocation() {
+        return new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    userLocation = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    };
+                    resolve(userLocation);
+                },
+                error => {
+                    reject(error);
+                }
+            );
+        });
+    }
+    function updateMap(location) {
+        map.setView([location.latitude, location.longitude], 13);
+        if (marker) {
+            marker.setLatLng([location.latitude, location.longitude]);
+            document.getElementById('location-status').textContent = 'Ubicación actualizada en ' + location.latitude + ', ' + location.longitude;
+        } else {
+            marker = L.marker([location.latitude, location.longitude]).addTo(map);
+            document.getElementById('location-status').textContent = 'Ubicación detectada en ' + location.latitude + ', ' + location.longitude;
+        }
+    }
 
-                document.getElementById('location-status').textContent =
-                    `Ubicación detectada: Latitud ${userLocation.latitude}, Longitud ${userLocation.longitude}`;
+    async function setupPage() {
+        initMap();
+        try {
+            const location = await detectLocation();
+            originalLocation = location
+            updateMap(location);
+            document.getElementById('location-status').textContent = 'Ubicación detectada correctamente en ' + location.latitude + ', ' + location.longitude;
+        } catch (error) {
+            document.getElementById('location-status').textContent = 'No se pudo detectar la ubicación. Por favor, active la geolocalización.';
+        }
+    }
+    setupPage();
+    // Configuración de SignalR
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/notificacionesHub")
+        .build();
+    
+    connection.start().catch(err => console.error(err.toString()));
 
-                // Inicializar el mapa de Leaflet
-                map = L.map('map').setView([userLocation.latitude, userLocation.longitude], 13);
+    // Manejo del formulario
+    document.getElementById('falloForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const usuario = document.getElementById('usuario').value;
+        const descripcion = document.getElementById('descripcion').value;
 
-                // Cargar la capa de mapas de OpenStreetMap
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '© OpenStreetMap'
-                }).addTo(map);
+        const fallo = {
+            usuario: usuario,
+            descripcion: descripcion,
+            fechaReporte: new Date(),
+            estado: 0, // 0 para Pendiente
+            PosicionLatitud: userLocation.latitude,
+            PosicionLongitud: userLocation.longitude
+        };
 
-                // Agregar un marcador en la ubicación del usuario
-                marker = L.marker([userLocation.latitude, userLocation.longitude]).addTo(map)
-                    .bindPopup('Estás aquí')
-                    .openPopup();
-
-                // Configurar el evento de clic en el mapa
-                map.on('click', onMapClick);
-            }, (error) => {
-                document.getElementById('location-status').textContent =
-                    "No se pudo detectar la ubicación. Por favor, activa la geolocalización en tu navegador.";
+        try {
+            const response = await fetch('/fallas/PostFallo', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(fallo)
             });
-        } else {
-            document.getElementById('location-status').textContent =
-                "La geolocalización no es soportada por este navegador.";
+
+            const result = await response.json();
+            document.getElementById('responseMessage').textContent = result.message;
+
+            // Enviar notificación a través de SignalR
+            connection.invoke("NuevoFalloReportado", "Nuevo fallo reportado").catch(err => console.error(err.toString()));
+
+            // Limpiar el formulario
+            document.getElementById('falloForm').reset();
+        } catch (error) {
+            console.error('Error:', error);
+            document.getElementById('responseMessage').textContent = 'Error al enviar el reporte.';
         }
-    }
-
-    // Función para manejar el clic en el mapa
-    function onMapClick(e) {
-        userLocation.latitude = e.latlng.lat;
-        userLocation.longitude = e.latlng.lng;
-
-        // Actualizar el marcador en la nueva ubicación
-        if (marker) {
-            marker.setLatLng(e.latlng)
-                .bindPopup('Nueva ubicación')  // Cambiar el mensaje aquí
-                .openPopup();
-        } else {
-            marker = L.marker(e.latlng).addTo(map)
-                .bindPopup('Nueva ubicación')  // Cambiar el mensaje aquí
-                .openPopup();
-        }
-
-        document.getElementById('location-status').textContent =
-            `Ubicación seleccionada: Latitud ${userLocation.latitude.toFixed(4)}, Longitud ${userLocation.longitude.toFixed(4)}`;
-    }
-
-    // Función para volver a la ubicación original
-    document.getElementById('resetLocation').addEventListener('click', () => {
-        if (marker) {
-            // Mover el marcador a la ubicación original
-            marker.setLatLng([originalLocation.latitude, originalLocation.longitude])
-                .bindPopup('Estás aquí')
-                .openPopup();
-        }
-
-        // Mover el mapa a la ubicación original
-        map.setView([originalLocation.latitude, originalLocation.longitude], 13);
-
-        document.getElementById('location-status').textContent =
-            `Ubicación detectada: Latitud ${originalLocation.latitude}, Longitud ${originalLocation.longitude}`;
     });
-
-    // Llamar a la función de detección de ubicación
-    detectUserLocation();
+    function onMapClick(e) {
+        marker.setLatLng(e.latlng);
+        userLocation = {
+            latitude: e.latlng.lat,
+            longitude: e.latlng.lng
+        };
+    }
+    map.on('click', onMapClick);
+    // Almacenamiento local
+    function guardarEnLocalStorage(fallo) {
+        let fallos = JSON.parse(localStorage.getItem('fallos')) || [];
+        fallos.push(fallo);
+        localStorage.setItem('fallos', JSON.stringify(fallos));
+    }
+    
+    function cargarDeLocalStorage() {
+        return JSON.parse(localStorage.getItem('fallos')) || [];
+    }
 </script>
+}

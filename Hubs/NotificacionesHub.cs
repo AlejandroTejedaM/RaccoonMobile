@@ -14,7 +14,7 @@ namespace RaccoonMobile.Hubs
         {
             await Clients.All.SendAsync("NuevoFalloReportado", fallo);
         }
-
+        
         public async Task FalloActualizado(Fallo fallo)
         {
             await Clients.All.SendAsync("FalloActualizado", fallo);

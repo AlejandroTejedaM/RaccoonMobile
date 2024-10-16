@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using RaccoonMobile.Models;
 using RaccoonMobile.Services;
+using Microsoft.AspNetCore.SignalR;
+using RaccoonMobile.Hubs;
 
 namespace RaccoonMobile.Controllers
 {
@@ -12,19 +12,22 @@ namespace RaccoonMobile.Controllers
     public class FallasController : Controller
     {
         private readonly IFalloServicio _fallosDeServicio;
+        private readonly IHubContext<NotificacionesHub> _hubContext;
 
-        public FallasController(IFalloServicio fallosDeServicio)
+        public FallasController(IFalloServicio fallosDeServicio, IHubContext<NotificacionesHub> hubContext)
         {
-            this._fallosDeServicio = fallosDeServicio;
+            _fallosDeServicio = fallosDeServicio;
+            _hubContext = hubContext;
         }
 
         [HttpGet]
         [Route("GetFallos")]
-        public IActionResult GetFallos()
+        public async Task<IActionResult> GetFallos()
         {
-            if (_fallosDeServicio.ObtenerFallos().Count > 0)
+            var fallos = await Task.Run(() => _fallosDeServicio.ObtenerFallos());
+            if (fallos.Count > 0)
             {
-                return Json(_fallosDeServicio.ObtenerFallos());
+                return Json(fallos);
             }
             else
             {
@@ -34,11 +37,12 @@ namespace RaccoonMobile.Controllers
 
         [HttpGet]
         [Route("GetFallos/{id}")]
-        public IActionResult GetFallos(int id)
+        public async Task<IActionResult> GetFallos(int id)
         {
-            if (_fallosDeServicio.ObtenerFallo(id) != null)
+            var fallo = await Task.Run(() => _fallosDeServicio.ObtenerFallo(id));
+            if (fallo != null)
             {
-                return Json(_fallosDeServicio.ObtenerFallo(id));
+                return Json(fallo);
             }
             else
             {
@@ -48,25 +52,28 @@ namespace RaccoonMobile.Controllers
 
         [HttpPost]
         [Route("PostFallo")]
-        public IActionResult PostFallo([FromBody] Fallo falloBody)
+        public async Task<IActionResult> PostFallo([FromBody] Fallo falloBody)
         {
-            Fallo? fallo = _fallosDeServicio.ReportarFallo(falloBody);
+            var fallo = await Task.Run(() => _fallosDeServicio.ReportarFallo(falloBody));
             if (fallo != null)
             {
+                await _hubContext.Clients.All.SendAsync("NuevoFalloReportado", $"Nuevo fallo reportado con id {fallo.id}");
                 return Json(new { message = $"Fallo reportado con id {fallo.id}" });
             }
             else
             {
-                return Json(new { message = "Error" });
+                return Json(new { message = "Error al reportar el fallo" });
             }
         }
 
         [HttpPut]
         [Route("UpdateFallo")]
-        public IActionResult UpdateFallo([FromBody] Fallo fallo)
+        public async Task<IActionResult> UpdateFallo([FromBody] Fallo fallo)
         {
-            if (_fallosDeServicio.ActualizarFallo(fallo))
+            var resultado = await Task.Run(() => _fallosDeServicio.ActualizarFallo(fallo));
+            if (resultado)
             {
+                await _hubContext.Clients.All.SendAsync("FalloActualizado", $"Fallo actualizado: {fallo.id}");
                 return Json(new { message = "Fallo actualizado" });
             }
             else
@@ -77,10 +84,12 @@ namespace RaccoonMobile.Controllers
 
         [HttpDelete]
         [Route("DeleteFallo/{id}")]
-        public IActionResult DeleteFallo(int id)
+        public async Task<IActionResult> DeleteFallo(int id)
         {
-            if (_fallosDeServicio.EliminarFallo(id))
+            var resultado = await Task.Run(() => _fallosDeServicio.EliminarFallo(id));
+            if (resultado)
             {
+                await _hubContext.Clients.All.SendAsync("FalloActualizado", $"Fallo eliminado: {id}");
                 return Json(new { message = "Fallo eliminado" });
             }
             else
@@ -88,7 +97,6 @@ namespace RaccoonMobile.Controllers
                 return Json(new { message = "Fallo no encontrado" });
             }
         }
-
         public IActionResult User()
         {
             return View();

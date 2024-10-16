@@ -1,3 +1,19 @@
 @{
     ViewData["Title"] = "Logistica de Problemas";
 }
+<script src="~/js/signalr.js"></script>
+<script>
+    const conexion = new signalR.HubConnectionBuilder()
+        .withUrl("/notificacionesHub")
+        .build();
+    
+    conexion.start().then((s) => {
+        alert("Conexión exitosa");
+    }).catch((e) => {
+        alert("Error al realizar la conexión");
+    });
+    
+    conexion.on("NuevoFalloReportado", e1 => {
+        alert(e1);
+    });
+</script>
