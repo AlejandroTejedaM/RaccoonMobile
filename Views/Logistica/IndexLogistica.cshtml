@@ -75,7 +75,7 @@
 <script>
     let map = null;
     let marker = null;
-    
+    let fallaOriginal = null;
     // Inicializar SignalR
     const connection = new signalR.HubConnectionBuilder()
         .withUrl("/notificacionesHub")
@@ -173,23 +173,22 @@
     function abrirModalActualizarEstado(fallo) {
         document.getElementById('falloId').value = fallo.id;
         document.getElementById('nuevoEstado').value = fallo.estado;
+        fallaOriginal = fallo;
         new bootstrap.Modal(document.getElementById('actualizarEstadoModal')).show();
     }
 
     document.getElementById('guardarEstado').addEventListener('click', async () => {
         const falloId = document.getElementById('falloId').value;
         const nuevoEstado = parseInt(document.getElementById('nuevoEstado').value);
-        
+        fallaOriginal.estado = nuevoEstado;
+        fallaOriginal.id = falloId;
         try {
             const response = await fetch('/fallas/UpdateFallo', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    id: falloId,
-                    estado: nuevoEstado
-                }),
+                body: JSON.stringify(fallaOriginal),
             });
 
             if (response.ok) {
