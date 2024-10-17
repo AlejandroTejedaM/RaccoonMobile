@@ -1,27 +1,45 @@
 @{
-ViewData["Title"] = "Logistica de Problemas";
+    ViewData["Title"] = "Logistica de Problemas";
 }
+
+<!-- Agregar CSS de Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
 
 <div class="container my-4">
     <h1 class="mb-3">Panel de Logística de Problemas</h1>
     <table class="table table-striped">
         <thead>
-        <tr>
-            <th>Usuario</th>
-            <th>Descripción</th>
-            <th>Ubicación</th>
-            <th>Fecha de Reporte</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-        </tr>
+            <tr>
+                <th>Usuario</th>
+                <th>Descripción</th>
+                <th>Ubicación</th>
+                <th>Fecha de Reporte</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
         </thead>
         <tbody id="fallosTableBody">
-        <!-- Rows will be populated dynamically -->
+            <!-- Rows will be populated dynamically -->
         </tbody>
     </table>
 </div>
 
-<!-- Modal para actualizar el estado del fallo -->
+<!-- Modal para el mapa -->
+<div class="modal fade" id="mapaModal" tabindex="-1" aria-labelledby="mapaModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="mapaModalLabel">Ubicación del Problema</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="map" style="height: 400px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para actualizar estado -->
 <div class="modal fade" id="actualizarEstadoModal" tabindex="-1" aria-labelledby="actualizarEstadoModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -53,94 +71,137 @@ ViewData["Title"] = "Logistica de Problemas";
 @section Scripts {
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="~/js/signalr.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
 <script>
-    let fallosChart, tiempoResolucionChart;
-    const connection = new signalR.HubConnectionBuilder().withUrl("/notificacionesHub").build();
-    let falloSeleccionado = null; // Para almacenar el fallo seleccionado
-
-    connection.start().then(() => {
-        console.log("Conexión SignalR establecida");
-    }).catch(err => console.error(err.toString()));
-
-    connection.on("NuevoFalloReportado", () => {
-        cargarFallos();
-    });
+    let map = null;
+    let marker = null;
     
-    connection.on("FalloActualizado", () => {
-        cargarFallos();
-    });
+    // Inicializar SignalR
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/notificacionesHub")
+        .withAutomaticReconnect()
+        .build();
+
+    connection.start();
+    connection.on("NuevoFalloReportado", cargarFallos);
+    connection.on("FalloActualizado", cargarFallos);
 
     async function cargarFallos() {
         try {
             const response = await fetch('/fallas/GetFallos');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            
             const fallos = await response.json();
             const tableBody = document.getElementById('fallosTableBody');
             tableBody.innerHTML = '';
-            if (fallos.message) {
-                tableBody.innerHTML = `<tr><td colspan="6" class="text-center">${fallos.message}</td></tr>`;
+
+            if (!Array.isArray(fallos) || fallos.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No hay fallos registrados</td></tr>';
                 return;
             }
+
             fallos.forEach(fallo => {
-                const row = `
-                <tr>
-                    <td>${fallo.usuario}</td>
-                    <td>${fallo.descripcion}</td>
-                    <td>Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}</td>
-                    <td>${new Date(fallo.fechaReporte).toLocaleString()}</td>
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${fallo.usuario || 'N/A'}</td>
+                    <td>${fallo.descripcion || 'N/A'}</td>
+                    <td>
+                        <a href="#" class="coordenadas-link" 
+                           data-lat="${fallo.posicionLatitud}" 
+                           data-lon="${fallo.posicionLongitud}">
+                            Lat: ${fallo.posicionLatitud?.toFixed(6) || 'N/A'}, 
+                            Lon: ${fallo.posicionLongitud?.toFixed(6) || 'N/A'}
+                        </a>
+                    </td>
+                    <td>${fallo.fechaReporte ? new Date(fallo.fechaReporte).toLocaleString() : 'N/A'}</td>
                     <td>${getEstadoText(fallo.estado)}</td>
                     <td>
-                        <button class="btn btn-primary btn-sm" onclick='abrirModalActualizarEstado(${JSON.stringify(fallo)})'>Actualizar Estado</button>
+                        <button class="btn btn-primary btn-sm" onclick='abrirModalActualizarEstado(${JSON.stringify(fallo)})'>
+                            Actualizar Estado
+                        </button>
                     </td>
-                </tr>
-            `;
-                tableBody.innerHTML += row;
+                `;
+                tableBody.appendChild(row);
             });
+
+            // Agregar event listeners solo para el clic en las coordenadas
+            document.querySelectorAll('.coordenadas-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const lat = parseFloat(link.dataset.lat);
+                    const lon = parseFloat(link.dataset.lon);
+                    mostrarMapa(lat, lon);
+                });
+            });
+
         } catch (error) {
-            console.error('Error al cargar los fallos:', error);
+            document.getElementById('fallosTableBody').innerHTML = 
+                '<tr><td colspan="6" class="text-center text-danger">Error al cargar los datos</td></tr>';
         }
     }
 
     function getEstadoText(estado) {
-        switch (estado) {
-            case 0: return 'Pendiente';
-            case 1: return 'Atendida';
-            case 2: return 'Cancelada';
-            default: return 'Desconocido';
-        }
+        const estados = {
+            0: 'Pendiente',
+            1: 'Atendida',
+            2: 'Cancelada'
+        };
+        return estados[estado] || 'Desconocido';
+    }
+
+    function mostrarMapa(lat, lon) {
+        if (!lat || !lon) return;
+        
+        const modal = new bootstrap.Modal(document.getElementById('mapaModal'));
+        modal.show();
+        
+        document.getElementById('mapaModal').addEventListener('shown.bs.modal', function () {
+            if (!map) {
+                map = L.map('map').setView([lat, lon], 15);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+                marker = L.marker([lat, lon]).addTo(map);
+            } else {
+                map.setView([lat, lon], 15);
+                marker.setLatLng([lat, lon]);
+            }
+            map.invalidateSize();
+        });
     }
 
     function abrirModalActualizarEstado(fallo) {
-        falloSeleccionado = fallo; // Guardamos el objeto completo
         document.getElementById('falloId').value = fallo.id;
         document.getElementById('nuevoEstado').value = fallo.estado;
         new bootstrap.Modal(document.getElementById('actualizarEstadoModal')).show();
     }
 
     document.getElementById('guardarEstado').addEventListener('click', async () => {
-        const nuevoEstado = parseInt(document.getElementById('nuevoEstado').value); // Aseguramos que sea un número
-        falloSeleccionado.estado = nuevoEstado; // Actualizamos el estado
-
+        const falloId = document.getElementById('falloId').value;
+        const nuevoEstado = parseInt(document.getElementById('nuevoEstado').value);
+        
         try {
             const response = await fetch('/fallas/UpdateFallo', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(falloSeleccionado), // Enviamos el objeto completo
+                body: JSON.stringify({
+                    id: falloId,
+                    estado: nuevoEstado
+                }),
             });
 
             if (response.ok) {
                 bootstrap.Modal.getInstance(document.getElementById('actualizarEstadoModal')).hide();
                 cargarFallos();
-            } else {
-                console.error('Error al actualizar el estado');
             }
         } catch (error) {
-            console.error('Error:', error);
+            console.error('Error en la actualización:', error);
         }
     });
 
     // Cargar datos iniciales
-    window.onload = cargarFallos;
+    document.addEventListener('DOMContentLoaded', cargarFallos);
 </script>
 }
