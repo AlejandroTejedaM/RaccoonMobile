@@ -1,0 +1,223 @@
+@{
+    ViewData["Title"] = "Dashboard de Logística";
+}
+
+<div class="container-fluid mt-4">
+    <h2 class="mb-4">Dashboard de Logística - Raccoon Mobile</h2>
+    
+    <!-- Resumen de Estadísticas -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Fallos Pendientes</h5>
+                    <h2 class="card-text" id="fallosPendientes">0</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Fallos Atendidos</h5>
+                    <h2 class="card-text" id="fallosAtendidos">0</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Fallos Cancelados</h5>
+                    <h2 class="card-text" id="fallosCancelados">0</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Estado de Fallos</h5>
+                    <canvas id="estadosFallosChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Fallos por Día</h5>
+                    <canvas id="fallosPorDiaChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Tiempo de Respuesta Promedio (últimos 7 días)</h5>
+                    <canvas id="tiempoRespuestaChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let connection = new signalR.HubConnectionBuilder()
+            .withUrl("/notificacionesHub")
+            .build();
+
+        // Almacenamiento de datos
+        let fallosData = {
+            pendientes: [],
+            atendidos: [],
+            cancelados: []
+        };
+
+        // Guardar preferencias del usuario
+        function guardarPreferencias() {
+            const preferencias = {
+                ultimaActualizacion: new Date().toISOString(),
+                filtros: {
+                    mostrarPendientes: true,
+                    mostrarAtendidos: true,
+                    mostrarCancelados: true
+                }
+            };
+            localStorage.setItem('preferenciasLogistica', JSON.stringify(preferencias));
+        }
+
+        // Guardar datos de la sesión actual
+        function guardarDatosSesion(datos) {
+            sessionStorage.setItem('fallosActuales', JSON.stringify(datos));
+        }
+
+        // Inicializar gráficos
+        function initCharts() {
+            // Gráfico de Estados de Fallos (Pie Chart)
+            const estadosCtx = document.getElementById('estadosFallosChart').getContext('2d');
+            const estadosChart = new Chart(estadosCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Pendientes', 'Atendidos', 'Cancelados'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: ['#007bff', '#28a745', '#dc3545']
+                    }]
+                }
+            });
+
+            // Gráfico de Fallos por Día (Line Chart)
+            const fallosDiaCtx = document.getElementById('fallosPorDiaChart').getContext('2d');
+            const fallosDiaChart = new Chart(fallosDiaCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Fallos Reportados',
+                        data: [],
+                        borderColor: '#007bff',
+                        fill: false
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Gráfico de Tiempo de Respuesta (Bar Chart)
+            const tiempoRespuestaCtx = document.getElementById('tiempoRespuestaChart').getContext('2d');
+            const tiempoRespuestaChart = new Chart(tiempoRespuestaCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Tiempo Promedio (horas)',
+                        data: [],
+                        backgroundColor: '#17a2b8'
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            return {
+                estadosChart,
+                fallosDiaChart,
+                tiempoRespuestaChart
+            };
+        }
+
+        // Actualizar datos y gráficos
+        async function actualizarDashboard() {
+            try {
+                const response = await fetch('/fallas/GetFallos');
+                const fallos = await response.json();
+                
+                // Procesar datos
+                fallosData = procesarFallos(fallos);
+                
+                // Guardar en sessionStorage
+                guardarDatosSesion(fallosData);
+                
+                // Actualizar contadores
+                document.getElementById('fallosPendientes').textContent = fallosData.pendientes.length;
+                document.getElementById('fallosAtendidos').textContent = fallosData.atendidos.length;
+                document.getElementById('fallosCancelados').textContent = fallosData.cancelados.length;
+                
+                // Actualizar gráficos
+                actualizarGraficos();
+                
+                // Guardar preferencias
+                guardarPreferencias();
+            } catch (error) {
+                console.error('Error al actualizar dashboard:', error);
+            }
+        }
+
+        function procesarFallos(fallos) {
+            return {
+                pendientes: fallos.filter(f => f.estado === 0),
+                atendidos: fallos.filter(f => f.estado === 1),
+                cancelados: fallos.filter(f => f.estado === 2)
+            };
+        }
+
+        // Conexión SignalR
+        connection.on("NuevoFalloReportado", (fallo) => {
+            actualizarDashboard();
+        });
+
+        connection.on("FalloActualizado", (fallo) => {
+            actualizarDashboard();
+        });
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', async () => {
+            await connection.start();
+            const charts = initCharts();
+            await actualizarDashboard();
+            
+            // Cargar preferencias guardadas
+            const preferenciasGuardadas = localStorage.getItem('preferenciasLogistica');
+            if (preferenciasGuardadas) {
+                const preferencias = JSON.parse(preferenciasGuardadas);
+                console.log('Preferencias cargadas:', preferencias);
+            }
+        });
+    </script>
+}
