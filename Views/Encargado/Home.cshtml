@@ -5,7 +5,8 @@
 <div class="container my-4">
     <h1 class="mb-3">Panel de Notificaciones</h1>
     <p>
-        Aquí puede ver todas las notificaciones de fallos reportados. Puede revisar la descripción del problema, la ubicación del reporte, y el estado actual de cada uno.
+        Aquí puede ver todas las notificaciones de fallos reportados. Puede revisar la descripción del problema, la
+        ubicación del reporte, y el estado actual de cada uno.
     </p>
 
     <!-- Tabla de notificaciones -->
@@ -50,52 +51,97 @@
 </div>
 
 @section Scripts {
-<script>
-    // Función para cargar fallos desde el controlador
-    async function cargarFallos() {
-        try {
-            const response = await fetch('/fallas/GetFallos');
-            const fallos = await response.json();
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="~/js/signalr.min.js"></script>
+    <script>
+        let fallosFiltrados = []; // Para almacenar los fallos filtrados
+        const connection = new signalR.HubConnectionBuilder().withUrl("/notificacionesHub").build();
 
-            const tableBody = document.getElementById('notificationsTable');
-            tableBody.innerHTML = '';
+        // Iniciar conexión SignalR
+        connection.start().then(() => {
+            console.log("Conexión SignalR establecida");
+        }).catch(err => console.error(err.toString()));
 
-            // Si no hay fallos, muestra el mensaje en una fila
-            if (fallos.message) {
-                tableBody.innerHTML = `<tr><td colspan="6" class="text-center">${fallos.message}</td></tr>`;
-                return;
+        // Escuchar el evento de nuevo fallo reportado
+        connection.on("NuevoFalloReportado", () => {
+            cargarFallos();
+        });
+
+        // Función para cargar fallos desde el controlador
+        async function cargarFallos() {
+            try {
+                const response = await fetch('/fallas/GetFallos');
+                const fallos = await response.json();
+
+                const tableBody = document.getElementById('notificationsTable');
+                tableBody.innerHTML = '';
+                fallosFiltrados = fallos.filter(fallo => fallo.estado === 1);
+
+                if (fallosFiltrados.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="6" class="text-center">No hay fallos finalizados.</td></tr>`;
+                    return;
+                }
+
+                fallosFiltrados.forEach((fallo, index) => {
+                    const ubicacion = `Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}`;
+                    const row = `
+                        <tr>
+                            <td>${fallo.usuario}</td>
+                            <td>${fallo.descripcion}</td>
+                            <td>${ubicacion}</td>
+                            <td>${new Date(fallo.fechaReporte).toLocaleDateString()}</td>
+                            <td>Finalizado</td>
+                            <td>
+                                <button class="btn btn-info btn-sm" onclick="verDetalles(${index})">Ver Detalles</button>
+                            </td>
+                        </tr>
+                    `;
+                    tableBody.innerHTML += row;
+                });
+            } catch (error) {
+                console.error('Error al cargar los fallos:', error);
             }
-
-            // Para cada fallo, genera una fila en la tabla
-            fallos.forEach((fallo, index) => {
-                const ubicacion = `Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}`;
-                const row = `
-                    <tr>
-                        <td>${fallo.usuario}</td>
-                        <td>${fallo.descripcion}</td>
-                        <td>${ubicacion}</td> <!-- Mostrar latitud y longitud aquí -->
-                        <td>${new Date(fallo.fechaReporte).toLocaleDateString()}</td>
-                        <td>${fallo.estado}</td>
-                        <td>
-                            <button class="btn btn-info btn-sm" onclick="verDetalles(${index})">Ver Detalles</button>
-                        </td>
-                    </tr>
-                `;
-                tableBody.innerHTML += row;
-            });
-        } catch (error) {
-            console.error('Error al cargar los fallos:', error);
         }
-    }
 
-    // Función para ver los detalles del fallo en el modal
-    function verDetalles(index) {
-        // Aquí puedes obtener los detalles específicos del fallo usando el índice
-        // Mostrar los datos en el modal...
-        // Ejemplo: document.getElementById('modalUsuario').textContent = fallos[index].usuario;
-    }
+        // Función para ver los detalles del fallo en el modal
+        function verDetalles(index) {
+            const fallo = fallosFiltrados[index];
+            document.getElementById('modalUsuario').textContent = fallo.usuario;
+            document.getElementById('modalDescripcion').textContent = fallo.descripcion;
+            document.getElementById('modalUbicacion').textContent = `Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}`;
+            document.getElementById('modalFechaReporte').textContent = new Date(fallo.fechaReporte).toLocaleDateString();
+            document.getElementById('modalEstado').textContent = 'Finalizado';
+        }
 
-    // Cargar fallos al cargar la página
-    window.onload = cargarFallos;
-</script>
+        // Actualizar estado del fallo
+        document.getElementById('btnActualizarEstado').addEventListener('click', async () => {
+            const fallo = fallosFiltrados.find(f => f.usuario === document.getElementById('modalUsuario').textContent);
+            if (fallo) {
+                // Aquí puedes implementar la lógica para actualizar el estado
+                fallo.estado = 0; // Por ejemplo, cambiar a "Pendiente"
+                
+                try {
+                    const response = await fetch('/fallas/UpdateFallo', {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(fallo),
+                    });
+
+                    if (response.ok) {
+                        cargarFallos(); // Recargar la tabla
+                        $('#notificationDetailsModal').modal('hide'); // Cerrar modal
+                    } else {
+                        console.error('Error al actualizar el estado');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            }
+        });
+
+        // Cargar fallos al cargar la página
+        window.onload = cargarFallos;
+    </script>
 }
