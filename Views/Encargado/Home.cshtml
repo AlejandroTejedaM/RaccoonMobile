@@ -19,7 +19,6 @@
                 <th>Fecha de Reporte</th>
                 <th>Fecha de Resolución</th>
                 <th>Tiempo Transcurrido</th> <!-- Modificado para incluir tiempo transcurrido -->
-                <th>Estado</th>
                 <th>Acciones</th>
             </tr>
         </thead>
@@ -42,11 +41,13 @@
                     <p><strong>Descripción:</strong> <span id="modalDescripcion"></span></p>
                     <p><strong>Ubicación:</strong> <span id="modalUbicacion"></span></p>
                     <p><strong>Fecha de Reporte:</strong> <span id="modalFechaReporte"></span></p>
+                    <p><strong>Fecha de Resolución:</strong> <span id="modalFechaResolucion"></span></p>
+                    <p><strong>Tiempo Transcurrido:</strong> <span id="modalTiempoTranscurrido"></span></p>
                     <p><strong>Estado:</strong> <span id="modalEstado"></span></p>
                 </div>
+
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                    <button type="button" class="btn btn-primary" id="btnActualizarEstado">Actualizar Estado</button>
                 </div>
             </div>
         </div>
@@ -85,7 +86,7 @@
                 fallosFiltrados = fallos.filter(fallo => fallo.estado === 1);
 
                 if (fallosFiltrados.length === 0) {
-                    tableBody.innerHTML = `<tr><td colspan="8" class="text-center">No hay fallos finalizados.</td></tr>`;
+                    tableBody.innerHTML = `<tr><td colspan="7" class="text-center">No hay fallos finalizados.</td></tr>`;
                     return;
                 }
 
@@ -98,19 +99,18 @@
                     const fechaResolucionFormateada = fechaResolucion ? `${fechaResolucion.toLocaleDateString()} ${fechaResolucion.toLocaleTimeString()}` : 'Pendiente';
 
                     const row = `
-                            <tr>
-                                <td>${fallo.usuario}</td>
-                                <td>${fallo.descripcion}</td>
-                                <td>${ubicacion}</td>
-                                <td>${fechaReporteFormateada}</td>
-                                <td>${fechaResolucionFormateada}</td>
-                                <td>${tiempoTranscurrido}</td> <!-- Mostrar tiempo transcurrido -->
-                                <td>Finalizado</td>
-                                <td>
-                                    <button class="btn btn-info btn-sm" onclick="verDetalles(${index})">Ver Detalles</button>
-                                </td>
-                            </tr>
-                        `;
+                                <tr>
+                                    <td>${fallo.usuario}</td>
+                                    <td>${fallo.descripcion}</td>
+                                    <td>${ubicacion}</td>
+                                    <td>${fechaReporteFormateada}</td>
+                                    <td>${fechaResolucionFormateada}</td>
+                                    <td>${tiempoTranscurrido}</td> <!-- Mostrar tiempo transcurrido -->
+                                    <td>
+                                        <button class="btn btn-info btn-sm" onclick="verDetalles(${index})">Ver Detalles</button>
+                                    </td>
+                                </tr>
+                            `;
                     tableBody.innerHTML += row;
                 });
 
@@ -132,43 +132,24 @@
         }
 
         // Función para ver los detalles del fallo en el modal
+        // Función para ver los detalles del fallo en el modal
         function verDetalles(index) {
             const fallo = fallosFiltrados[index];
             const fechaReporte = new Date(fallo.fechaReporte);
+            const fechaResolucion = fallo.fechaResolucion ? new Date(fallo.fechaResolucion) : null; // Mantener null si no hay resolución
+            const tiempoTranscurrido = calcularTiempoTranscurrido(fechaReporte, fechaResolucion); // Calcular tiempo transcurrido
+
             document.getElementById('modalUsuario').textContent = fallo.usuario;
             document.getElementById('modalDescripcion').textContent = fallo.descripcion;
             document.getElementById('modalUbicacion').textContent = `Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}`;
             document.getElementById('modalFechaReporte').textContent = `${fechaReporte.toLocaleDateString()} ${fechaReporte.toLocaleTimeString()}`;
-            document.getElementById('modalEstado').textContent = 'Finalizado';
+            document.getElementById('modalFechaResolucion').textContent = fechaResolucion ? `${fechaResolucion.toLocaleDateString()} ${fechaResolucion.toLocaleTimeString()}` : 'Pendiente';
+            document.getElementById('modalTiempoTranscurrido').textContent = tiempoTranscurrido; // Mostrar tiempo transcurrido
+            document.getElementById('modalEstado').textContent = fallo.estado === 1 ? 'Finalizado' : 'Pendiente'; // Mostrar estado
+
+            $('#notificationDetailsModal').modal('show');
         }
 
-        // Actualizar estado del fallo
-        document.getElementById('btnActualizarEstado').addEventListener('click', async () => {
-            const fallo = fallosFiltrados.find(f => f.usuario === document.getElementById('modalUsuario').textContent);
-            if (fallo) {
-                // Aquí puedes implementar la lógica para actualizar el estado
-                fallo.estado = 0; // Por ejemplo, cambiar a "Pendiente"
-
-                try {
-                    const response = await fetch('/fallas/UpdateFallo', {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(fallo),
-                    });
-
-                    if (response.ok) {
-                        cargarFallos(); // Recargar la tabla
-                        $('#notificationDetailsModal').modal('hide'); // Cerrar modal
-                    } else {
-                        console.error('Error al actualizar el estado');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                }
-            }
-        });
 
         // Cargar fallos al cargar la página
         window.onload = cargarFallos();
