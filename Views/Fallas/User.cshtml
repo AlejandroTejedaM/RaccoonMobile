@@ -9,30 +9,51 @@ ViewData["Title"] = "Reporte de Fallo";
     </p>
 
     <div class="row">
-        <div class="col-8">
+        <div class="col-md-6">
             <div class="alert alert-info" role="alert">
                 <strong>Ubicación:</strong> <span id="location-status">Detectando ubicación...</span>
             </div>
+            <div id="map" style="width: 100%; height: 400px; margin-bottom: 20px;"></div>
         </div>
-        <div id="UbicacionOriginal" class="col-4">
-            <button class="btn btn-primary" onclick="updateMap(originalLocation)">Restaurar Ubicación</button>
+        <div class="col-md-6">
+            <form id="falloForm">
+                <div class="mb-3">
+                    <label for="usuario" class="form-label">Nombre de Usuario</label>
+                    <input type="text" class="form-control" id="usuario" required>
+                </div>
+                <div class="mb-3">
+                    <label for="descripcion" class="form-label">Descripción del Problema</label>
+                    <textarea class="form-control" id="descripcion" rows="3" required></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="dispositivo" class="form-label">Dispositivo</label>
+                    <select class="form-control" id="dispositivo">
+                        <option value="">Seleccione un dispositivo</option>
+                        <option value="Samsung">Samsung</option>
+                        <option value="iPhone">iPhone</option>
+                        <option value="Huawei">Huawei</option>
+                        <option value="Xiaomi">Xiaomi</option>
+                        <option value="Motorola">Motorola</option>
+                        <option value="LG">LG</option>
+                        <option value="Otro">Otro (especificar)</option>
+                    </select>
+                    <input type="text" class="form-control mt-2" id="dispositivoPersonalizado" placeholder="Especifique el dispositivo" style="display: none;">
+                </div>
+                <div class="mb-3">
+                    <label for="tipoRed" class="form-label">Tipo de Red</label>
+                    <select class="form-control" id="tipoRed" required>
+                        <option value="">Seleccione el tipo de red</option>
+                        <option value="2G">2G</option>
+                        <option value="3G">3G</option>
+                        <option value="4G">4G</option>
+                        <option value="5G">5G</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Enviar Reporte</button>
+            </form>
+            <div id="responseMessage" class="mt-3 text-danger text-start"></div>
         </div>
-    </div>    
-    <div id="map" style="width: 100%; height: 400px; margin-bottom: 20px;"></div>
-
-    <form id="falloForm">
-        <div class="mb-3">
-            <label for="usuario" class="form-label">Nombre de Usuario</label>
-            <input type="text" class="form-control" id="usuario" required>
-        </div>
-        <div class="mb-3">
-            <label for="descripcion" class="form-label">Descripción del Problema</label>
-            <textarea class="form-control" id="descripcion" rows="3" required></textarea>
-        </div>
-        <button type="submit" class="btn btn-primary">Enviar Reporte</button>
-    </form>
-
-    <div id="responseMessage" class="mt-3"></div>
+    </div>
 </div>
 
 @section Scripts {
@@ -66,6 +87,7 @@ ViewData["Title"] = "Reporte de Fallo";
             );
         });
     }
+
     function updateMap(location) {
         map.setView([location.latitude, location.longitude], 13);
         if (marker) {
@@ -81,19 +103,21 @@ ViewData["Title"] = "Reporte de Fallo";
         initMap();
         try {
             const location = await detectLocation();
-            originalLocation = location
+            originalLocation = location;
             updateMap(location);
             document.getElementById('location-status').textContent = 'Ubicación detectada correctamente en ' + location.latitude + ', ' + location.longitude;
         } catch (error) {
             document.getElementById('location-status').textContent = 'No se pudo detectar la ubicación. Por favor, active la geolocalización.';
         }
+        loadFormData();
     }
+
     setupPage();
-    // Configuración de SignalR
+
     const connection = new signalR.HubConnectionBuilder()
         .withUrl("/notificacionesHub")
         .build();
-    
+
     connection.start().catch(err => console.error(err.toString()));
 
     // Manejo del formulario
@@ -101,16 +125,23 @@ ViewData["Title"] = "Reporte de Fallo";
         e.preventDefault();
         const usuario = document.getElementById('usuario').value;
         const descripcion = document.getElementById('descripcion').value;
+        const dispositivo = document.getElementById('dispositivo').value === 'Otro' ? document.getElementById('dispositivoPersonalizado').value : document.getElementById('dispositivo').value;
+        const tipoRed = document.getElementById('tipoRed').value;
 
         const fallo = {
             usuario: usuario,
             descripcion: descripcion,
+            dispositivo: dispositivo,
+            tipoRed: tipoRed,
             fechaReporte: new Date(),
             estado: 0, // 0 para Pendiente
             PosicionLatitud: userLocation.latitude,
             PosicionLongitud: userLocation.longitude
         };
-
+        if(!fallo.dispositivo === 'Otro' && !fallo.dispositivoPersonalizado || fallo.dispositivo === '') {
+            document.getElementById('responseMessage').textContent = 'Por favor, especifique el dispositivo.';
+            return false;
+        }
         try {
             const response = await fetch('/fallas/PostFallo', {
                 method: 'POST',
@@ -124,32 +155,67 @@ ViewData["Title"] = "Reporte de Fallo";
             document.getElementById('responseMessage').textContent = result.message;
 
             // Enviar notificación a través de SignalR
-            connection.invoke("NuevoFalloReportado", "Nuevo fallo reportado").catch(err => console.error(err.toString()));
+            //connection.invoke("NuevoFalloReportado", "Nuevo fallo reportado").catch(err => console.error(err.toString()));
 
-            // Limpiar el formulario
+            // Limpiar el formulario    
             document.getElementById('falloForm').reset();
+            localStorage.removeItem('falloFormData');
         } catch (error) {
             console.error('Error:', error);
             document.getElementById('responseMessage').textContent = 'Error al enviar el reporte.';
         }
     });
+
     function onMapClick(e) {
         marker.setLatLng(e.latlng);
         userLocation = {
             latitude: e.latlng.lat,
             longitude: e.latlng.lng
         };
+        saveFormData();
+        updateMap(userLocation);
     }
+
     map.on('click', onMapClick);
+
     // Almacenamiento local
-    function guardarEnLocalStorage(fallo) {
-        let fallos = JSON.parse(localStorage.getItem('fallos')) || [];
-        fallos.push(fallo);
-        localStorage.setItem('fallos', JSON.stringify(fallos));
+    function saveFormData() {
+        const formData = {
+            usuario: document.getElementById('usuario').value,
+            descripcion: document.getElementById('descripcion').value,
+            dispositivo: document.getElementById('dispositivo').value,
+            dispositivoPersonalizado: document.getElementById('dispositivoPersonalizado').value,
+            tipoRed: document.getElementById('tipoRed').value,
+            userLocation: userLocation
+        };
+        localStorage.setItem('falloFormData', JSON.stringify(formData));
     }
-    
-    function cargarDeLocalStorage() {
-        return JSON.parse(localStorage.getItem('fallos')) || [];
+
+    function loadFormData() {
+        const formData = JSON.parse(localStorage.getItem('falloFormData'));
+        if (formData) {
+            document.getElementById('usuario').value = formData.usuario;
+            document.getElementById('descripcion').value = formData.descripcion;
+            document.getElementById('dispositivo').value = formData.dispositivo;
+            document.getElementById('dispositivoPersonalizado').value = formData.dispositivoPersonalizado;
+            document.getElementById('tipoRed').value = formData.tipoRed;
+            userLocation = formData.userLocation;
+            updateMap(userLocation);
+        }
     }
+
+    document.getElementById('falloForm').addEventListener('input', saveFormData);
+
+    document.getElementById('dispositivo').addEventListener('change', function() {
+        const dispositivoPersonalizado = document.getElementById('dispositivoPersonalizado');
+        if (this.value === 'Otro') {
+            dispositivoPersonalizado.style.display = 'block';
+            dispositivoPersonalizado.required = true;
+        } else {
+            dispositivoPersonalizado.style.display = 'none';
+            dispositivoPersonalizado.required = false;
+        }
+        saveFormData();
+    });
 </script>
 }
