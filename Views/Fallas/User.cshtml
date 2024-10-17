@@ -139,7 +139,7 @@
             PosicionLatitud: userLocation.latitude,
             PosicionLongitud: userLocation.longitude
         };
-        if (!fallo.dispositivo === 'Otro' && !fallo.dispositivoPersonalizado || fallo.dispositivo === '') {
+        if(!fallo.dispositivo === 'Otro' && !fallo.dispositivoPersonalizado || fallo.dispositivo === '') {
             document.getElementById('responseMessage').textContent = 'Por favor, especifique el dispositivo.';
             return false;
         }
@@ -156,6 +156,9 @@
             document.getElementById('responseMessage').textContent = result.message;
             document.getElementById('falloForm').reset();
             localStorage.removeItem('falloFormData');
+
+            // Notify the hub about the new report
+            connection.invoke("NuevoFalloReportado", JSON.stringify(fallo));
         } catch (error) {
             console.error('Error:', error);
             document.getElementById('responseMessage').textContent = 'Error al enviar el reporte.';
@@ -195,8 +198,10 @@
             document.getElementById('dispositivo').value = formData.dispositivo;
             document.getElementById('dispositivoPersonalizado').value = formData.dispositivoPersonalizado;
             document.getElementById('tipoRed').value = formData.tipoRed;
-            userLocation = formData.userLocation;
-            updateMap(userLocation);
+            if (formData.userLocation) {
+                userLocation = formData.userLocation;
+                updateMap(userLocation);
+            }
         }
     }
 
