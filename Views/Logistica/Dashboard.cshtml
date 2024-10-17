@@ -1,5 +1,5 @@
 ﻿@{
-    ViewData["Title"] = "Dashboard de Logística";
+ViewData["Title"] = "Dashboard de Logística";
 }
 
 <div class="container-fluid mt-4">
@@ -66,154 +66,209 @@
 </div>
 
 @section Scripts {
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="~/js/signalr.min.js"></script>
-    <script>
-        let estadosChart, fallosDiaChart, tiempoRespuestaChart;
-        // Configuración de SignalR
-        const connection = new signalR.HubConnectionBuilder()
-            .withUrl("/notificacionesHub")
-            .withAutomaticReconnect()
-            .build();
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="~/js/signalr.min.js"></script>
+<script>
+    let estadosChart, fallosDiaChart, tiempoRespuestaChart;
+    // Configuración de SignalR
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/notificacionesHub")
+        .withAutomaticReconnect()
+        .build();
 
-        initCharts();
-        connection.start();
-        actualizarDashboard();
+    initCharts();
+    connection.start();
+    actualizarDashboard();
 
-        // Configurar listeners para eventos de SignalR
-        connection.on("NuevoFalloReportado", actualizarDashboard);
-        connection.on("FalloActualizado", actualizarDashboard);
-        // Inicializar gráficos
-        function initCharts() {
-            // Gráfico de Estados de Fallos (Pie Chart)
-            const estadosCtx = document.getElementById('estadosFallosChart').getContext('2d');
-            estadosChart = new Chart(estadosCtx, {
-                type: 'pie',
-                data: {
-                    labels: ['Pendiente', 'Atendida', 'Cancelada'],
-                    datasets: [{
-                        data: [0, 0, 0],
-                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(tooltipItem) {
-                                    return `${tooltipItem.label}: ${tooltipItem.raw}`;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-            // Gráfico de Fallos por Día (Line Chart)
-            const fallosDiaCtx = document.getElementById('fallosPorDiaChart').getContext('2d');
-            fallosDiaChart = new Chart(fallosDiaCtx, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Fallos Reportados',
-                        data: [],
-                        borderColor: '#007bff',
-                        fill: false
-                    }]
-                },
-                options: {
-                    scales: {
-                        y: { beginAtZero: true }
-                    }
-                }
-            });
+    // Configurar listeners para eventos de SignalR
+    connection.on("NuevoFalloReportado", actualizarDashboard);
+    connection.on("FalloActualizado", actualizarDashboard);
 
-            // Gráfico de Tiempo de Respuesta (Line Chart)
-            const tiempoRespuestaCtx = document.getElementById('tiempoPromedioRespuesta').getContext('2d');
-            tiempoRespuestaChart = new Chart(tiempoRespuestaCtx, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Tiempo Promedio (minutos)',
-                        data: [],
-                        borderColor: '#17a2b8',
-                        fill: false
-                    }]
-                },
-                options: {
-                    scales: {
-                        y: { beginAtZero: true }
-                    }
-                }, plugins: {
+    // Inicializar gráficos
+    function initCharts() {
+        // Gráfico de Estados de Fallos (Pie Chart)
+        const estadosCtx = document.getElementById('estadosFallosChart').getContext('2d');
+        estadosChart = new Chart(estadosCtx, {
+            type: 'pie',
+            data: {
+                labels: ['Pendiente', 'Atendida', 'Cancelada'],
+                datasets: [{
+                    data: [0, 0, 0],
+                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
                     tooltip: {
                         callbacks: {
                             label: function(tooltipItem) {
-                                return `${tooltipItem.label}: ${tooltipItem.raw} minutos`;
+                                return `${tooltipItem.label}: ${tooltipItem.raw}`;
                             }
                         }
                     }
                 }
-            });
-
-        // Actualizar dashboard con datos del API
-        async function actualizarDashboard() {
-            try {
-                // Obtener datos de estados
-                const estadosResponse = await fetch('/Fallas/Estadisticas/Estados');
-                const estadosData = await estadosResponse.json();
-                // Actualizar gráfico de estados
-                estadosChart.data.datasets[0].data = [
-                    estadosData['Pendiente'] || 0,
-                    estadosData['Atendida'] || 0,
-                    estadosData['Cancelada'] || 0
-                ];
-                estadosChart.update();
-
-                // Actualizar contadores
-                document.getElementById('fallosPendientes').textContent = estadosData['Pendiente'] || 0;
-                document.getElementById('fallosAtendidos').textContent = estadosData['Atendida'] || 0;
-                document.getElementById('fallosCancelados').textContent = estadosData['Cancelada'] || 0;
-
-                // Obtener datos de fallos por día
-                const fallosPorDiaResponse = await fetch('/Fallas/Estadisticas/FallosPorDia');
-                const fallosPorDiaData = await fallosPorDiaResponse.json();
-
-                // Actualizar gráfico de fallos por día
-                if (fallosPorDiaData) {
-                    // Actualizar gráfico de fallos por día
-                    const fechas = Object.keys(fallosPorDiaData);
-                    const cantidades = Object.values(fallosPorDiaData);
-                    fallosDiaChart.data.labels = fechas.map(formatFecha);
-                    fallosDiaChart.data.datasets[0].data = cantidades;
-                    fallosDiaChart.update();
-                }
-
-                // Obtener datos de tiempo promedio de respuesta por día
-                const tiempoPromedioResponse = await fetch('/Fallas/Estadisticas/TiempoPromedioRespuesta');
-                const tiempoPromedioData = await tiempoPromedioResponse.json();
-                if (tiempoPromedioData) {
-                    // Actualizar gráfico de tiempo promedio de respuesta por día
-                    const fechas = Object.keys(tiempoPromedioData.tiempoPromedio);
-                    const tiemposPromedio = Object.values(tiempoPromedioData.tiempoPromedio);
-                    tiempoRespuestaChart.data.labels = fechas.map(formatFecha);
-                    tiempoRespuestaChart.data.datasets[0].data = tiemposPromedio;
-                    tiempoRespuestaChart.update();
-                }
-
-            } catch (error) {
-                console.error('Error al actualizar dashboard:', error);
             }
+        });
+
+        // Gráfico de Fallos por Día (Line Chart)
+        const fallosDiaCtx = document.getElementById('fallosPorDiaChart').getContext('2d');
+        fallosDiaChart = new Chart(fallosDiaCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Fallos Reportados',
+                    data: [],
+                    borderColor: '#007bff',
+                    fill: false
+                }]
+            },
+            options: {
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        // Gráfico de Tiempo de Respuesta (Line Chart)
+        const tiempoRespuestaCtx = document.getElementById('tiempoPromedioRespuesta').getContext('2d');
+        tiempoRespuestaChart = new Chart(tiempoRespuestaCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Tiempo Promedio (minutos)',
+                    data: [],
+                    borderColor: '#17a2b8',
+                    fill: false
+                }]
+            },
+            options: {
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }, plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(tooltipItem) {
+                            return `${tooltipItem.label}: ${tooltipItem.raw} minutos`;
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Actualizar dashboard con datos del API
+    async function actualizarDashboard() {
+        try {
+            // Obtener datos de estados
+            const estadosResponse = await fetch('/Fallas/Estadisticas/Estados');
+            const estadosData = await estadosResponse.json();
+
+            // Guardar datos en sessionStorage
+            sessionStorage.setItem('estadosData', JSON.stringify(estadosData));
+
+            // Actualizar gráfico de estados
+            estadosChart.data.datasets[0].data = [
+                estadosData['Pendiente'] || 0,
+                estadosData['Atendida'] || 0,
+                estadosData['Cancelada'] || 0
+            ];
+            estadosChart.update();
+
+            // Actualizar contadores
+            document.getElementById('fallosPendientes').textContent = estadosData['Pendiente'] || 0;
+            document.getElementById('fallosAtendidos').textContent = estadosData['Atendida'] || 0;
+            document.getElementById('fallosCancelados').textContent = estadosData['Cancelada'] || 0;
+
+            // Obtener datos de fallos por día
+            const fallosPorDiaResponse = await fetch('/Fallas/Estadisticas/FallosPorDia');
+            const fallosPorDiaData = await fallosPorDiaResponse.json();
+
+            // Guardar datos en sessionStorage
+            sessionStorage.setItem('fallosPorDiaData', JSON.stringify(fallosPorDiaData));
+
+            // Actualizar gráfico de fallos por día
+            if (fallosPorDiaData) {
+                const fechas = Object.keys(fallosPorDiaData);
+                const cantidades = Object.values(fallosPorDiaData);
+                fallosDiaChart.data.labels = fechas.map(formatFecha);
+                fallosDiaChart.data.datasets[0].data = cantidades;
+                fallosDiaChart.update();
+            }
+
+            // Obtener datos de tiempo promedio de respuesta por día
+            const tiempoPromedioResponse = await fetch('/Fallas/Estadisticas/TiempoPromedioRespuesta');
+            const tiempoPromedioData = await tiempoPromedioResponse.json();
+
+            // Guardar datos en sessionStorage
+            sessionStorage.setItem('tiempoPromedioData', JSON.stringify(tiempoPromedioData));
+
+            if (tiempoPromedioData) {
+                const fechas = Object.keys(tiempoPromedioData.tiempoPromedio);
+                const tiemposPromedio = Object.values(tiempoPromedioData.tiempoPromedio);
+                tiempoRespuestaChart.data.labels = fechas.map(formatFecha);
+                tiempoRespuestaChart.data.datasets[0].data = tiemposPromedio;
+                tiempoRespuestaChart.update();
+            }
+
+        } catch (error) {
+            console.error('Error al actualizar dashboard:', error);
+        }
+    }
+
+    function formatFecha(fecha) {
+        const opciones = { year: 'numeric', month: 'long', day: 'numeric' };
+        return new Date(fecha).toLocaleDateString('es-MX', opciones);
+    }
+
+    // Recuperar datos de sessionStorage al cargar la página
+    document.addEventListener('DOMContentLoaded', () => {
+        const estadosData = JSON.parse(sessionStorage.getItem('estadosData'));
+        if (estadosData) {
+            // Actualizar gráfico de estados
+            estadosChart.data.datasets[0].data = [
+                estadosData['Pendiente'] || 0,
+                estadosData['Atendida'] || 0,
+                estadosData['Cancelada'] || 0
+            ];
+            estadosChart.update();
+
+            // Actualizar contadores
+            document.getElementById('fallosPendientes').textContent = estadosData['Pendiente'] || 0;
+            document.getElementById('fallosAtendidos').textContent = estadosData['Atendida'] || 0;
+            document.getElementById('fallosCancelados').textContent = estadosData['Cancelada'] || 0;
         }
 
-        function formatFecha(fecha) {
-            const opciones = { year: 'numeric', month: 'long', day: 'numeric' };
-            return new Date(fecha).toLocaleDateString('es-MX', opciones);
+        const fallosPorDiaData = JSON.parse(sessionStorage.getItem('fallosPorDiaData'));
+        if (fallosPorDiaData) {
+            const fechas = Object.keys(fallosPorDiaData);
+            const cantidades = Object.values(fallosPorDiaData);
+            fallosDiaChart.data.labels = fechas.map(formatFecha);
+            fallosDiaChart.data.datasets[0].data = cantidades;
+            fallosDiaChart.update();
         }
-    </script>
+
+        const tiempoPromedioData = JSON.parse(sessionStorage.getItem('tiempoPromedioData'));
+        if (tiempoPromedioData) {
+            const fechas = Object.keys(tiempoPromedioData.tiempoPromedio);
+            const tiemposPromedio = Object.values(tiempoPromedioData.tiempoPromedio);
+            tiempoRespuestaChart.data.labels = fechas.map(formatFecha);
+            tiempoRespuestaChart.data.datasets[0].data = tiemposPromedio;
+            tiempoRespuestaChart.update();
+        }
+    });
+
+    // Eliminar datos de sessionStorage
+    function limpiarSessionStorage() {
+        sessionStorage.removeItem('estadosData');
+        sessionStorage.removeItem('fallosPorDiaData');
+        sessionStorage.removeItem('tiempoPromedioData');
+    }
+</script>
 }
