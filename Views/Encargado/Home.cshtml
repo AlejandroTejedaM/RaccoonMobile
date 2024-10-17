@@ -1,0 +1,101 @@
+@{
+    ViewData["Title"] = "Panel de Notificaciones";
+}
+
+<div class="container my-4">
+    <h1 class="mb-3">Panel de Notificaciones</h1>
+    <p>
+        Aquí puede ver todas las notificaciones de fallos reportados. Puede revisar la descripción del problema, la ubicación del reporte, y el estado actual de cada uno.
+    </p>
+
+    <!-- Tabla de notificaciones -->
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Usuario</th>
+                <th>Descripción</th>
+                <th>Ubicación</th>
+                <th>Fecha de Reporte</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="notificationsTable">
+            <!-- Aquí se generarán las filas dinámicamente -->
+        </tbody>
+    </table>
+
+    <!-- Modal para ver detalles de la notificación -->
+    <div class="modal fade" id="notificationDetailsModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="notificationTitle">Detalles del Reporte</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Usuario:</strong> <span id="modalUsuario"></span></p>
+                    <p><strong>Descripción:</strong> <span id="modalDescripcion"></span></p>
+                    <p><strong>Ubicación:</strong> <span id="modalUbicacion"></span></p>
+                    <p><strong>Fecha de Reporte:</strong> <span id="modalFechaReporte"></span></p>
+                    <p><strong>Estado:</strong> <span id="modalEstado"></span></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-primary" id="btnActualizarEstado">Actualizar Estado</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Función para cargar fallos desde el controlador
+    async function cargarFallos() {
+        try {
+            const response = await fetch('/fallas/GetFallos');
+            const fallos = await response.json();
+
+            const tableBody = document.getElementById('notificationsTable');
+            tableBody.innerHTML = '';
+
+            // Si no hay fallos, muestra el mensaje en una fila
+            if (fallos.message) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="text-center">${fallos.message}</td></tr>`;
+                return;
+            }
+
+            // Para cada fallo, genera una fila en la tabla
+            fallos.forEach((fallo, index) => {
+                const ubicacion = `Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}`;
+                const row = `
+                    <tr>
+                        <td>${fallo.usuario}</td>
+                        <td>${fallo.descripcion}</td>
+                        <td>${ubicacion}</td> <!-- Mostrar latitud y longitud aquí -->
+                        <td>${new Date(fallo.fechaReporte).toLocaleDateString()}</td>
+                        <td>${fallo.estado}</td>
+                        <td>
+                            <button class="btn btn-info btn-sm" onclick="verDetalles(${index})">Ver Detalles</button>
+                        </td>
+                    </tr>
+                `;
+                tableBody.innerHTML += row;
+            });
+        } catch (error) {
+            console.error('Error al cargar los fallos:', error);
+        }
+    }
+
+    // Función para ver los detalles del fallo en el modal
+    function verDetalles(index) {
+        // Aquí puedes obtener los detalles específicos del fallo usando el índice
+        // Mostrar los datos en el modal...
+        // Ejemplo: document.getElementById('modalUsuario').textContent = fallos[index].usuario;
+    }
+
+    // Cargar fallos al cargar la página
+    window.onload = cargarFallos;
+</script>
+}
