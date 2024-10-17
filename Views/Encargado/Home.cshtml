@@ -17,6 +17,7 @@
                 <th>Descripción</th>
                 <th>Ubicación</th>
                 <th>Fecha de Reporte</th>
+                <th>Fecha de Resolución</th> <!-- Nueva columna -->
                 <th>Estado</th>
                 <th>Acciones</th>
             </tr>
@@ -26,8 +27,10 @@
         </tbody>
     </table>
 
+
     <!-- Modal para ver detalles de la notificación -->
-    <div class="modal fade" id="notificationDetailsModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal fade" id="notificationDetailsModal" tabindex="-1" aria-labelledby="exampleModalLabel"
+        aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -84,12 +87,14 @@
 
                 fallosFiltrados.forEach((fallo, index) => {
                     const ubicacion = `Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}`;
+                    const fechaResolucion = fallo.fechaResolucion ? new Date(fallo.fechaResolucion).toLocaleDateString() : 'Pendiente'; // Mostrar 'Pendiente' si no hay fecha
                     const row = `
                         <tr>
                             <td>${fallo.usuario}</td>
                             <td>${fallo.descripcion}</td>
                             <td>${ubicacion}</td>
                             <td>${new Date(fallo.fechaReporte).toLocaleDateString()}</td>
+                            <td>${fechaResolucion}</td> <!-- Mostrar la fecha de resolución -->
                             <td>Finalizado</td>
                             <td>
                                 <button class="btn btn-info btn-sm" onclick="verDetalles(${index})">Ver Detalles</button>
@@ -98,6 +103,7 @@
                     `;
                     tableBody.innerHTML += row;
                 });
+
             } catch (error) {
                 console.error('Error al cargar los fallos:', error);
             }
@@ -119,7 +125,7 @@
             if (fallo) {
                 // Aquí puedes implementar la lógica para actualizar el estado
                 fallo.estado = 0; // Por ejemplo, cambiar a "Pendiente"
-                
+
                 try {
                     const response = await fetch('/fallas/UpdateFallo', {
                         method: 'PUT',
