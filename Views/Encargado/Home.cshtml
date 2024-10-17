@@ -92,10 +92,10 @@
                 fallosFiltrados.forEach((fallo, index) => {
                     const ubicacion = `Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}`;
                     const fechaReporte = new Date(fallo.fechaReporte);
-                    const fechaResolucion = fallo.fechaResolucion ? new Date(fallo.fechaResolucion) : 'Pendiente'; // Mostrar 'Pendiente' si no hay fecha
-                    const tiempoTranscurrido = calcularTiempoTranscurrido(fechaReporte); // Calcular tiempo transcurrido
+                    const fechaResolucion = fallo.fechaResolucion ? new Date(fallo.fechaResolucion) : null; // Mantener null si no hay resolución
+                    const tiempoTranscurrido = calcularTiempoTranscurrido(fechaReporte, fechaResolucion); // Calcular tiempo transcurrido
                     const fechaReporteFormateada = `${fechaReporte.toLocaleDateString()} ${fechaReporte.toLocaleTimeString()}`;
-                    const fechaResolucionFormateada = fechaResolucion instanceof Date ? `${fechaResolucion.toLocaleDateString()} ${fechaResolucion.toLocaleTimeString()}` : 'Pendiente';
+                    const fechaResolucionFormateada = fechaResolucion ? `${fechaResolucion.toLocaleDateString()} ${fechaResolucion.toLocaleTimeString()}` : 'Pendiente';
 
                     const row = `
                             <tr>
@@ -120,9 +120,9 @@
         }
 
         // Función para calcular el tiempo transcurrido en días, horas, minutos y segundos
-        function calcularTiempoTranscurrido(fechaReporte) {
-            const ahora = new Date();
-            const diferencia = Math.floor((ahora - fechaReporte) / 1000); // Diferencia en segundos
+        function calcularTiempoTranscurrido(fechaReporte, fechaResolucion) {
+            const fechaFin = fechaResolucion ? new Date(fechaResolucion) : new Date(); // Si hay fecha de resolución, usarla; de lo contrario, usar la fecha actual
+            const diferencia = Math.floor((fechaFin - fechaReporte) / 1000); // Diferencia en segundos
             const dias = Math.floor(diferencia / (24 * 3600));
             const horas = Math.floor((diferencia % (24 * 3600)) / 3600);
             const minutos = Math.floor((diferencia % 3600) / 60);
