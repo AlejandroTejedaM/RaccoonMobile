@@ -40,7 +40,8 @@
 </div>
 
 <!-- Modal para actualizar estado -->
-<div class="modal fade" id="actualizarEstadoModal" tabindex="-1" aria-labelledby="actualizarEstadoModalLabel" aria-hidden="true">
+<div class="modal fade" id="actualizarEstadoModal" tabindex="-1" aria-labelledby="actualizarEstadoModalLabel"
+    aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
@@ -69,138 +70,143 @@
 </div>
 
 @section Scripts {
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="~/js/signalr.min.js"></script>
-<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-<script>
-    let map = null;
-    let marker = null;
-    let fallaOriginal = null;
-    // Inicializar SignalR
-    const connection = new signalR.HubConnectionBuilder()
-        .withUrl("/notificacionesHub")
-        .withAutomaticReconnect()
-        .build();
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="~/js/signalr.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        let map = null;
+        let marker = null;
+        let fallaOriginal = null;
+        // Inicializar SignalR
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/notificacionesHub")
+            .withAutomaticReconnect()
+            .build();
 
-    connection.start();
-    connection.on("NuevoFalloReportado", cargarFallos);
-    connection.on("FalloActualizado", cargarFallos);
+        connection.start();
+        connection.on("NuevoFalloReportado", cargarFallos);
+        connection.on("FalloActualizado", cargarFallos);
 
-    async function cargarFallos() {
-        try {
-            const response = await fetch('/fallas/GetFallos');
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            
-            const fallos = await response.json();
-            const tableBody = document.getElementById('fallosTableBody');
-            tableBody.innerHTML = '';
+        async function cargarFallos() {
+            try {
+                const response = await fetch('/fallas/GetFallos');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
-            if (!Array.isArray(fallos) || fallos.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No hay fallos registrados</td></tr>';
-                return;
-            }
+                const fallos = await response.json();
+                const tableBody = document.getElementById('fallosTableBody');
+                tableBody.innerHTML = '';
 
-            fallos.forEach(fallo => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${fallo.usuario || 'N/A'}</td>
-                    <td>${fallo.descripcion || 'N/A'}</td>
-                    <td>
-                        <a href="#" class="coordenadas-link" 
-                           data-lat="${fallo.posicionLatitud}" 
-                           data-lon="${fallo.posicionLongitud}">
-                            Lat: ${fallo.posicionLatitud?.toFixed(6) || 'N/A'}, 
-                            Lon: ${fallo.posicionLongitud?.toFixed(6) || 'N/A'}
-                        </a>
-                    </td>
-                    <td>${fallo.fechaReporte ? new Date(fallo.fechaReporte).toLocaleString() : 'N/A'}</td>
-                    <td>${getEstadoText(fallo.estado)}</td>
-                    <td>
-                        <button class="btn btn-primary btn-sm" onclick='abrirModalActualizarEstado(${JSON.stringify(fallo)})'>
-                            Actualizar Estado
-                        </button>
-                    </td>
-                `;
-                tableBody.appendChild(row);
-            });
+                if (!Array.isArray(fallos) || fallos.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No hay fallos registrados</td></tr>';
+                    return;
+                }
 
-            // Agregar event listeners solo para el clic en las coordenadas
-            document.querySelectorAll('.coordenadas-link').forEach(link => {
-                link.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const lat = parseFloat(link.dataset.lat);
-                    const lon = parseFloat(link.dataset.lon);
-                    mostrarMapa(lat, lon);
+                fallos.forEach(fallo => {
+                    const row = document.createElement('tr');
+                    const isPendiente = fallo.estado === 0; // Estado 0 significa 'Pendiente'
+
+                    row.innerHTML = `
+            <td>${fallo.usuario || 'N/A'}</td>
+            <td>${fallo.descripcion || 'N/A'}</td>
+            <td>
+                <a href="#" class="coordenadas-link" 
+                   data-lat="${fallo.posicionLatitud}" 
+                   data-lon="${fallo.posicionLongitud}">
+                    Lat: ${fallo.posicionLatitud?.toFixed(6) || 'N/A'}, 
+                    Lon: ${fallo.posicionLongitud?.toFixed(6) || 'N/A'}
+                </a>
+            </td>
+            <td>${fallo.fechaReporte ? new Date(fallo.fechaReporte).toLocaleString() : 'N/A'}</td>
+            <td>${getEstadoText(fallo.estado)}</td>
+            <td>
+                <button class="btn btn-primary btn-sm" 
+                    onclick='abrirModalActualizarEstado(${JSON.stringify(fallo)})' 
+                    ${isPendiente ? '' : 'disabled'}>
+                    Actualizar Estado
+                </button>
+            </td>
+        `;
+                    tableBody.appendChild(row);
                 });
-            });
 
-        } catch (error) {
-            document.getElementById('fallosTableBody').innerHTML = 
-                '<tr><td colspan="6" class="text-center text-danger">Error al cargar los datos</td></tr>';
-        }
-    }
 
-    function getEstadoText(estado) {
-        const estados = {
-            0: 'Pendiente',
-            1: 'Atendida',
-            2: 'Cancelada'
-        };
-        return estados[estado] || 'Desconocido';
-    }
+                // Agregar event listeners solo para el clic en las coordenadas
+                document.querySelectorAll('.coordenadas-link').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const lat = parseFloat(link.dataset.lat);
+                        const lon = parseFloat(link.dataset.lon);
+                        mostrarMapa(lat, lon);
+                    });
+                });
 
-    function mostrarMapa(lat, lon) {
-        if (!lat || !lon) return;
-        
-        const modal = new bootstrap.Modal(document.getElementById('mapaModal'));
-        modal.show();
-        
-        document.getElementById('mapaModal').addEventListener('shown.bs.modal', function () {
-            if (!map) {
-                map = L.map('map').setView([lat, lon], 15);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors'
-                }).addTo(map);
-                marker = L.marker([lat, lon]).addTo(map);
-            } else {
-                map.setView([lat, lon], 15);
-                marker.setLatLng([lat, lon]);
+            } catch (error) {
+                document.getElementById('fallosTableBody').innerHTML =
+                    '<tr><td colspan="6" class="text-center text-danger">Error al cargar los datos</td></tr>';
             }
-            map.invalidateSize();
+        }
+
+        function getEstadoText(estado) {
+            const estados = {
+                0: 'Pendiente',
+                1: 'Atendida',
+                2: 'Cancelada'
+            };
+            return estados[estado] || 'Desconocido';
+        }
+
+        function mostrarMapa(lat, lon) {
+            if (!lat || !lon) return;
+
+            const modal = new bootstrap.Modal(document.getElementById('mapaModal'));
+            modal.show();
+
+            document.getElementById('mapaModal').addEventListener('shown.bs.modal', function () {
+                if (!map) {
+                    map = L.map('map').setView([lat, lon], 15);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '© OpenStreetMap contributors'
+                    }).addTo(map);
+                    marker = L.marker([lat, lon]).addTo(map);
+                } else {
+                    map.setView([lat, lon], 15);
+                    marker.setLatLng([lat, lon]);
+                }
+                map.invalidateSize();
+            });
+        }
+
+        function abrirModalActualizarEstado(fallo) {
+            document.getElementById('falloId').value = fallo.id;
+            document.getElementById('nuevoEstado').value = fallo.estado;
+            fallaOriginal = fallo;
+            new bootstrap.Modal(document.getElementById('actualizarEstadoModal')).show();
+        }
+
+        document.getElementById('guardarEstado').addEventListener('click', async () => {
+            const falloId = document.getElementById('falloId').value;
+            const nuevoEstado = parseInt(document.getElementById('nuevoEstado').value);
+            fallaOriginal.estado = nuevoEstado;
+            fallaOriginal.id = falloId;
+            try {
+                const response = await fetch('/fallas/UpdateFallo', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(fallaOriginal),
+                });
+
+                if (response.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('actualizarEstadoModal')).hide();
+                    cargarFallos();
+                }
+            } catch (error) {
+                console.error('Error en la actualización:', error);
+            }
         });
-    }
 
-    function abrirModalActualizarEstado(fallo) {
-        document.getElementById('falloId').value = fallo.id;
-        document.getElementById('nuevoEstado').value = fallo.estado;
-        fallaOriginal = fallo;
-        new bootstrap.Modal(document.getElementById('actualizarEstadoModal')).show();
-    }
-
-    document.getElementById('guardarEstado').addEventListener('click', async () => {
-        const falloId = document.getElementById('falloId').value;
-        const nuevoEstado = parseInt(document.getElementById('nuevoEstado').value);
-        fallaOriginal.estado = nuevoEstado;
-        fallaOriginal.id = falloId;
-        try {
-            const response = await fetch('/fallas/UpdateFallo', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(fallaOriginal),
-            });
-
-            if (response.ok) {
-                bootstrap.Modal.getInstance(document.getElementById('actualizarEstadoModal')).hide();
-                cargarFallos();
-            }
-        } catch (error) {
-            console.error('Error en la actualización:', error);
-        }
-    });
-
-    // Cargar datos iniciales
-    document.addEventListener('DOMContentLoaded', cargarFallos);
-</script>
+        // Cargar datos iniciales
+        document.addEventListener('DOMContentLoaded', cargarFallos);
+    </script>
 }
