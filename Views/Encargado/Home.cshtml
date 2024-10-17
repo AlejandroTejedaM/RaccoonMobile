@@ -9,7 +9,25 @@
         ubicación del reporte, y el estado actual de cada uno.
     </p>
 
-    <!-- Tabla de notificaciones -->
+    <!-- Tabla de fallos pendientes -->
+    <h2 class="mt-5">Fallos Pendientes</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Usuario</th>
+                <th>Descripción</th>
+                <th>Ubicación</th>
+                <th>Fecha de Reporte</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="pendingNotificationsTable">
+            <!-- Aquí se generarán las filas dinámicamente -->
+        </tbody>
+    </table>
+
+    <!-- Tabla de fallos atendidos -->
+    <h2 class="mt-5">Fallos Atendidos</h2>
     <table class="table table-striped">
         <thead>
             <tr>
@@ -18,7 +36,7 @@
                 <th>Ubicación</th>
                 <th>Fecha de Reporte</th>
                 <th>Fecha de Resolución</th>
-                <th>Tiempo Transcurrido</th> <!-- Modificado para incluir tiempo transcurrido -->
+                <th>Tiempo Transcurrido</th>
                 <th>Acciones</th>
             </tr>
         </thead>
@@ -27,9 +45,26 @@
         </tbody>
     </table>
 
+    <!-- Tabla de fallos cancelados -->
+    <h2 class="mt-5">Fallos Cancelados</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Usuario</th>
+                <th>Descripción</th>
+                <th>Ubicación</th>
+                <th>Fecha de Reporte</th>
+                <th>Tiempo Transcurrido</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="cancelledNotificationsTable">
+            <!-- Aquí se generarán las filas dinámicamente -->
+        </tbody>
+    </table>
+
     <!-- Modal para ver detalles de la notificación -->
-    <div class="modal fade" id="notificationDetailsModal" tabindex="-1" aria-labelledby="exampleModalLabel"
-        aria-hidden="true">
+    <div class="modal fade" id="notificationDetailsModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -45,7 +80,6 @@
                     <p><strong>Tiempo Transcurrido:</strong> <span id="modalTiempoTranscurrido"></span></p>
                     <p><strong>Estado:</strong> <span id="modalEstado"></span></p>
                 </div>
-
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
                 </div>
@@ -58,15 +92,13 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="~/js/signalr.min.js"></script>
     <script>
-        let fallosFiltrados = []; // Para almacenar los fallos filtrados
+        let fallosFiltrados = []; 
         const connection = new signalR.HubConnectionBuilder().withUrl("/notificacionesHub").build();
 
-        // Iniciar conexión SignalR
         connection.start().then(() => {
             console.log("Conexión SignalR establecida");
         }).catch(err => console.error(err.toString()));
 
-        // Escuchar el evento de nuevo fallo reportado
         connection.on("NuevoFalloReportado", () => {
             cargarFallos();
         });
@@ -75,83 +107,122 @@
             cargarFallos();
         });
 
-        // Función para cargar fallos desde el controlador
         async function cargarFallos() {
             try {
                 const response = await fetch('/fallas/GetFallos');
                 const fallos = await response.json();
 
-                const tableBody = document.getElementById('notificationsTable');
-                tableBody.innerHTML = '';
-                fallosFiltrados = fallos.filter(fallo => fallo.estado === 1);
+                // Tabla de fallos pendientes
+                const tableBodyPendientes = document.getElementById('pendingNotificationsTable');
+                tableBodyPendientes.innerHTML = '';
+                const fallosPendientes = fallos.filter(fallo => fallo.estado === 0);
 
-                if (fallosFiltrados.length === 0) {
-                    tableBody.innerHTML = `<tr><td colspan="7" class="text-center">No hay fallos finalizados.</td></tr>`;
-                    return;
+                if (fallosPendientes.length === 0) {
+                    tableBodyPendientes.innerHTML = `<tr><td colspan="5" class="text-center">No hay fallos pendientes.</td></tr>`;
+                } else {
+                    fallosPendientes.forEach((fallo, index) => {
+                        const ubicacion = `Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}`;
+                        const fechaReporte = new Date(fallo.fechaReporte);
+                        const fechaReporteFormateada = `${fechaReporte.toLocaleDateString()} ${fechaReporte.toLocaleTimeString()}`;
+
+                        const row = `
+                        <tr>
+                            <td>${fallo.usuario}</td>
+                            <td>${fallo.descripcion}</td>
+                            <td>${ubicacion}</td>
+                            <td>${fechaReporteFormateada}</td>
+                            <td><button class="btn btn-info btn-sm" onclick="verDetalles(${index})">Ver Detalles</button></td>
+                        </tr>`;
+                        tableBodyPendientes.innerHTML += row;
+                    });
                 }
 
-                fallosFiltrados.forEach((fallo, index) => {
-                    const ubicacion = `Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}`;
-                    const fechaReporte = new Date(fallo.fechaReporte);
-                    const fechaResolucion = fallo.fechaResolucion ? new Date(fallo.fechaResolucion) : null; // Mantener null si no hay resolución
-                    const tiempoTranscurrido = calcularTiempoTranscurrido(fechaReporte, fechaResolucion); // Calcular tiempo transcurrido
-                    const fechaReporteFormateada = `${fechaReporte.toLocaleDateString()} ${fechaReporte.toLocaleTimeString()}`;
-                    const fechaResolucionFormateada = fechaResolucion ? `${fechaResolucion.toLocaleDateString()} ${fechaResolucion.toLocaleTimeString()}` : 'Pendiente';
+                // Tabla de fallos atendidos
+                const tableBodyAtendidos = document.getElementById('notificationsTable');
+                tableBodyAtendidos.innerHTML = '';
+                const fallosAtendidos = fallos.filter(fallo => fallo.estado === 1);
 
-                    const row = `
-                                <tr>
-                                    <td>${fallo.usuario}</td>
-                                    <td>${fallo.descripcion}</td>
-                                    <td>${ubicacion}</td>
-                                    <td>${fechaReporteFormateada}</td>
-                                    <td>${fechaResolucionFormateada}</td>
-                                    <td>${tiempoTranscurrido}</td> <!-- Mostrar tiempo transcurrido -->
-                                    <td>
-                                        <button class="btn btn-info btn-sm" onclick="verDetalles(${index})">Ver Detalles</button>
-                                    </td>
-                                </tr>
-                            `;
-                    tableBody.innerHTML += row;
-                });
+                if (fallosAtendidos.length === 0) {
+                    tableBodyAtendidos.innerHTML = `<tr><td colspan="7" class="text-center">No hay fallos finalizados.</td></tr>`;
+                } else {
+                    fallosAtendidos.forEach((fallo, index) => {
+                        const ubicacion = `Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}`;
+                        const fechaReporte = new Date(fallo.fechaReporte);
+                        const fechaResolucion = fallo.fechaResolucion ? new Date(fallo.fechaResolucion) : null;
+                        const tiempoTranscurrido = calcularTiempoTranscurrido(fechaReporte, fechaResolucion);
+                        const fechaReporteFormateada = `${fechaReporte.toLocaleDateString()} ${fechaReporte.toLocaleTimeString()}`;
+                        const fechaResolucionFormateada = fechaResolucion ? `${fechaResolucion.toLocaleDateString()} ${fechaResolucion.toLocaleTimeString()}` : 'Pendiente';
 
+                        const row = `
+                        <tr>
+                            <td>${fallo.usuario}</td>
+                            <td>${fallo.descripcion}</td>
+                            <td>${ubicacion}</td>
+                            <td>${fechaReporteFormateada}</td>
+                            <td>${fechaResolucionFormateada}</td>
+                            <td>${tiempoTranscurrido}</td>
+                            <td><button class="btn btn-info btn-sm" onclick="verDetalles(${index})">Ver Detalles</button></td>
+                        </tr>`;
+                        tableBodyAtendidos.innerHTML += row;
+                    });
+                }
+
+                // Tabla de fallos cancelados
+                const tableBodyCancelados = document.getElementById('cancelledNotificationsTable');
+                tableBodyCancelados.innerHTML = '';
+                const fallosCancelados = fallos.filter(fallo => fallo.estado === 2);
+
+                if (fallosCancelados.length === 0) {
+                    tableBodyCancelados.innerHTML = `<tr><td colspan="6" class="text-center">No hay fallos cancelados.</td></tr>`;
+                } else {
+                    fallosCancelados.forEach((fallo, index) => {
+                        const ubicacion = `Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}`;
+                        const fechaReporte = new Date(fallo.fechaReporte);
+                        const tiempoTranscurrido = calcularTiempoTranscurrido(fechaReporte, new Date());
+                        const fechaReporteFormateada = `${fechaReporte.toLocaleDateString()} ${fechaReporte.toLocaleTimeString()}`;
+
+                        const row = `
+                        <tr>
+                            <td>${fallo.usuario}</td>
+                            <td>${fallo.descripcion}</td>
+                            <td>${ubicacion}</td>
+                            <td>${fechaReporteFormateada}</td>
+                            <td>${tiempoTranscurrido}</td>
+                            <td><button class="btn btn-info btn-sm" onclick="verDetalles(${index})">Ver Detalles</button></td>
+                        </tr>`;
+                        tableBodyCancelados.innerHTML += row;
+                    });
+                }
+
+                fallosFiltrados = fallos; // Almacenar fallos filtrados para usar en verDetalles
             } catch (error) {
                 console.error('Error al cargar los fallos:', error);
             }
         }
 
-        // Función para calcular el tiempo transcurrido en días, horas, minutos y segundos
-        function calcularTiempoTranscurrido(fechaReporte, fechaResolucion) {
-            const fechaFin = fechaResolucion ? new Date(fechaResolucion) : new Date(); // Si hay fecha de resolución, usarla; de lo contrario, usar la fecha actual
-            const diferencia = Math.floor((fechaFin - fechaReporte) / 1000); // Diferencia en segundos
-            const dias = Math.floor(diferencia / (24 * 3600));
-            const horas = Math.floor((diferencia % (24 * 3600)) / 3600);
-            const minutos = Math.floor((diferencia % 3600) / 60);
-            const segundos = diferencia % 60;
-
-            return `${dias}d ${horas}h ${minutos}m ${segundos}s`;
+        function calcularTiempoTranscurrido(fechaInicio, fechaFin) {
+            if (!fechaFin) return 'Pendiente';
+            const diff = Math.abs(fechaFin - fechaInicio);
+            const horas = Math.floor(diff / (1000 * 60 * 60));
+            const minutos = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            return `${horas} horas, ${minutos} minutos`;
         }
 
-        // Función para ver los detalles del fallo en el modal
-        // Función para ver los detalles del fallo en el modal
         function verDetalles(index) {
             const fallo = fallosFiltrados[index];
-            const fechaReporte = new Date(fallo.fechaReporte);
-            const fechaResolucion = fallo.fechaResolucion ? new Date(fallo.fechaResolucion) : null; // Mantener null si no hay resolución
-            const tiempoTranscurrido = calcularTiempoTranscurrido(fechaReporte, fechaResolucion); // Calcular tiempo transcurrido
-
-            document.getElementById('modalUsuario').textContent = fallo.usuario;
-            document.getElementById('modalDescripcion').textContent = fallo.descripcion;
-            document.getElementById('modalUbicacion').textContent = `Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}`;
-            document.getElementById('modalFechaReporte').textContent = `${fechaReporte.toLocaleDateString()} ${fechaReporte.toLocaleTimeString()}`;
-            document.getElementById('modalFechaResolucion').textContent = fechaResolucion ? `${fechaResolucion.toLocaleDateString()} ${fechaResolucion.toLocaleTimeString()}` : 'Pendiente';
-            document.getElementById('modalTiempoTranscurrido').textContent = tiempoTranscurrido; // Mostrar tiempo transcurrido
-            document.getElementById('modalEstado').textContent = fallo.estado === 1 ? 'Finalizado' : 'Pendiente'; // Mostrar estado
-
+            document.getElementById('modalUsuario').innerText = fallo.usuario;
+            document.getElementById('modalDescripcion').innerText = fallo.descripcion;
+            document.getElementById('modalUbicacion').innerText = `Lat: ${fallo.posicionLatitud}, Lon: ${fallo.posicionLongitud}`;
+            document.getElementById('modalFechaReporte').innerText = new Date(fallo.fechaReporte).toLocaleString();
+            document.getElementById('modalFechaResolucion').innerText = fallo.fechaResolucion ? new Date(fallo.fechaResolucion).toLocaleString() : 'Pendiente';
+            document.getElementById('modalTiempoTranscurrido').innerText = calcularTiempoTranscurrido(new Date(fallo.fechaReporte), new Date());
+            document.getElementById('modalEstado').innerText = fallo.estado === 0 ? 'Pendiente' : (fallo.estado === 1 ? 'Atendido' : 'Cancelado');
             $('#notificationDetailsModal').modal('show');
         }
 
-
-        // Cargar fallos al cargar la página
-        window.onload = cargarFallos();
+        // Cargar los fallos al inicio
+        window.onload = () => {
+            cargarFallos();
+        };
     </script>
 }
