@@ -1,19 +1,140 @@
 @{
-    ViewData["Title"] = "Logistica de Problemas";
+ViewData["Title"] = "Logistica de Problemas";
 }
-<script src="~/js/signalr.js"></script>
+
+<div class="container my-4">
+    <h1 class="mb-3">Panel de Logística de Problemas</h1>
+    <table class="table table-striped">
+        <thead>
+        <tr>
+            <th>Usuario</th>
+            <th>Descripción</th>
+            <th>Ubicación</th>
+            <th>Fecha de Reporte</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+        </tr>
+        </thead>
+        <tbody id="fallosTableBody">
+        <!-- Rows will be populated dynamically -->
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal para actualizar el estado del fallo -->
+<div class="modal fade" id="actualizarEstadoModal" tabindex="-1" aria-labelledby="actualizarEstadoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="actualizarEstadoModalLabel">Actualizar Estado del Fallo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="actualizarEstadoForm">
+                    <input type="hidden" id="falloId">
+                    <div class="mb-3">
+                        <label for="nuevoEstado" class="form-label">Nuevo Estado</label>
+                        <select class="form-select" id="nuevoEstado" required>
+                            <option value="0">Pendiente</option>
+                            <option value="1">Atendida</option>
+                            <option value="2">Cancelada</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-primary" id="guardarEstado">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="~/js/signalr.min.js"></script>
 <script>
-    const conexion = new signalR.HubConnectionBuilder()
-        .withUrl("/notificacionesHub")
-        .build();
-    
-    conexion.start().then((s) => {
-        alert("Conexión exitosa");
-    }).catch((e) => {
-        alert("Error al realizar la conexión");
+    let fallosChart, tiempoResolucionChart;
+    const connection = new signalR.HubConnectionBuilder().withUrl("/notificacionesHub").build();
+    let falloSeleccionado = null; // Para almacenar el fallo seleccionado
+
+    connection.start().then(() => {
+        console.log("Conexión SignalR establecida");
+    }).catch(err => console.error(err.toString()));
+
+    connection.on("NuevoFalloReportado", () => {
+        cargarFallos();
     });
-    
-    conexion.on("NuevoFalloReportado", e1 => {
-        alert(e1);
+
+    async function cargarFallos() {
+        try {
+            const response = await fetch('/fallas/GetFallos');
+            const fallos = await response.json();
+            const tableBody = document.getElementById('fallosTableBody');
+            tableBody.innerHTML = '';
+
+            fallos.forEach(fallo => {
+                const row = `
+                <tr>
+                    <td>${fallo.usuario}</td>
+                    <td>${fallo.descripcion}</td>
+                    <td>Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}</td>
+                    <td>${new Date(fallo.fechaReporte).toLocaleString()}</td>
+                    <td>${getEstadoText(fallo.estado)}</td>
+                    <td>
+                        <button class="btn btn-primary btn-sm" onclick='abrirModalActualizarEstado(${JSON.stringify(fallo)})'>Actualizar Estado</button>
+                    </td>
+                </tr>
+            `;
+                tableBody.innerHTML += row;
+            });
+        } catch (error) {
+            console.error('Error al cargar los fallos:', error);
+        }
+    }
+
+    function getEstadoText(estado) {
+        switch (estado) {
+            case 0: return 'Pendiente';
+            case 1: return 'Atendida';
+            case 2: return 'Cancelada';
+            default: return 'Desconocido';
+        }
+    }
+
+    function abrirModalActualizarEstado(fallo) {
+        falloSeleccionado = fallo; // Guardamos el objeto completo
+        document.getElementById('falloId').value = fallo.id;
+        document.getElementById('nuevoEstado').value = fallo.estado;
+        new bootstrap.Modal(document.getElementById('actualizarEstadoModal')).show();
+    }
+
+    document.getElementById('guardarEstado').addEventListener('click', async () => {
+        const nuevoEstado = parseInt(document.getElementById('nuevoEstado').value); // Aseguramos que sea un número
+        falloSeleccionado.estado = nuevoEstado; // Actualizamos el estado
+
+        try {
+            const response = await fetch('/fallas/UpdateFallo', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(falloSeleccionado), // Enviamos el objeto completo
+            });
+
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('actualizarEstadoModal')).hide();
+                cargarFallos();
+            } else {
+                console.error('Error al actualizar el estado');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
     });
+
+    // Cargar datos iniciales
+    cargarFallos();
+
 </script>
+}
