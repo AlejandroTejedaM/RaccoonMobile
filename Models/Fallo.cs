@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-
 namespace RaccoonMobile.Models
 {
     public class Fallo
@@ -15,6 +10,7 @@ namespace RaccoonMobile.Models
         public Estado estado { get; set; }
         public Double PosicionLatitud { get; set; }
         public Double PosicionLongitud { get; set; }
-
+        public String? dispositivo { get; set; }
+        public String? tipoRed { get; set; }
     }
 }

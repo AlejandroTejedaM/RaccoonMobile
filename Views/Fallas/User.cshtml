@@ -153,11 +153,6 @@ ViewData["Title"] = "Reporte de Fallo";
 
             const result = await response.json();
             document.getElementById('responseMessage').textContent = result.message;
-
-            // Enviar notificación a través de SignalR
-            //connection.invoke("NuevoFalloReportado", "Nuevo fallo reportado").catch(err => console.error(err.toString()));
-
-            // Limpiar el formulario    
             document.getElementById('falloForm').reset();
             localStorage.removeItem('falloFormData');
         } catch (error) {
