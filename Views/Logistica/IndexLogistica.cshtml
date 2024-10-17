@@ -65,6 +65,10 @@ ViewData["Title"] = "Logistica de Problemas";
     connection.on("NuevoFalloReportado", () => {
         cargarFallos();
     });
+    
+    connection.on("FalloActualizado", () => {
+        cargarFallos();
+    });
 
     async function cargarFallos() {
         try {
@@ -72,7 +76,10 @@ ViewData["Title"] = "Logistica de Problemas";
             const fallos = await response.json();
             const tableBody = document.getElementById('fallosTableBody');
             tableBody.innerHTML = '';
-
+            if (fallos.message) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="text-center">${fallos.message}</td></tr>`;
+                return;
+            }
             fallos.forEach(fallo => {
                 const row = `
                 <tr>
@@ -134,7 +141,6 @@ ViewData["Title"] = "Logistica de Problemas";
     });
 
     // Cargar datos iniciales
-    cargarFallos();
-
+    window.onload = cargarFallos;
 </script>
 }
