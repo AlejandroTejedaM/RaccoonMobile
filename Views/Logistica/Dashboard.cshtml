@@ -67,184 +67,153 @@
 
 @section Scripts {
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="~/js/signalr.min.js"></script>
     <script>
-    let connection = new signalR.HubConnectionBuilder()
-        .withUrl("/notificacionesHub")
-        .build();
-    
-    // Variables para almacenar los gráficos
-    let estadosChart, fallosDiaChart, tiempoRespuestaChart;
-    
-    // Almacenamiento de datos
-    let fallosData = {
-        pendientes: [],
-        atendidos: [],
-        cancelados: [],
-        fallosPorDia: {},
-        tiempoRespuesta: []
-    };
+        let estadosChart, fallosDiaChart, tiempoRespuestaChart;
+        // Configuración de SignalR
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/notificacionesHub")
+            .withAutomaticReconnect()
+            .build();
 
-    // Inicializar gráficos
-    function initCharts() {
-        // Gráfico de Estados de Fallos (Pie Chart)
-        const estadosChart = new Chart(ctx, {
-            type: 'pie',
-            data: {
-                labels: ['Pendiente', 'Atendida', 'Cancelada'],
-                datasets: [{
-                    data: [0, 0, 0], // Se actualiza dinámicamente
-                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(tooltipItem) {
-                                return `${tooltipItem.label}: ${tooltipItem.raw}`;
+        initCharts();
+        connection.start();
+        actualizarDashboard();
+
+        // Configurar listeners para eventos de SignalR
+        connection.on("NuevoFalloReportado", actualizarDashboard);
+        connection.on("FalloActualizado", actualizarDashboard);
+        // Inicializar gráficos
+        function initCharts() {
+            // Gráfico de Estados de Fallos (Pie Chart)
+            const estadosCtx = document.getElementById('estadosFallosChart').getContext('2d');
+            estadosChart = new Chart(estadosCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Pendiente', 'Atendida', 'Cancelada'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(tooltipItem) {
+                                    return `${tooltipItem.label}: ${tooltipItem.raw}`;
+                                }
                             }
                         }
                     }
                 }
-            }
-        });
-
-        // Gráfico de Fallos por Día (Line Chart)
-        const fallosDiaCtx = document.getElementById('fallosPorDiaChart').getContext('2d');
-        fallosDiaChart = new Chart(fallosDiaCtx, {
-            type: 'line',
-            data: {
-                labels: [], // Fechas
-                datasets: [{
-                    label: 'Fallos Reportados',
-                    data: [], // Número de fallos por día
-                    borderColor: '#007bff',
-                    fill: false
-                }]
-            },
-            options: {
-                scales: {
-                    y: { beginAtZero: true }
-                }
-            }
-        });
-
-        // Gráfico de Tiempo de Respuesta (Bar Chart)
-        const tiempoRespuestaCtx = document.getElementById('tiempoRespuestaChart').getContext('2d');
-        tiempoRespuestaChart = new Chart(tiempoRespuestaCtx, {
-            type: 'bar',
-            data: {
-                labels: [], // Fechas
-                datasets: [{
-                    label: 'Tiempo Promedio (horas)',
-                    data: [], // Tiempo promedio en horas
-                    backgroundColor: '#17a2b8'
-                }]
-            },
-            options: {
-                scales: {
-                    y: { beginAtZero: true }
-                }
-            }
-        });
-    }
-
-    // Procesar datos de la API
-    function procesarFallos(fallos) {
-        const fallosPorDia = {};
-        const tiempoRespuesta = [];
-
-        fallos.forEach(fallo => {
-            const fechaReporte = fallo.fechaReporte.split('T')[0]; // Obtener solo la fecha
-            const horasResolucion = (new Date(fallo.fechaResolucion) - new Date(fallo.fechaReporte)) / 36e5;
-
-            // Contabilizar estados
-            switch (fallo.estado) {
-                case 0: fallosData.pendientes.push(fallo); break;
-                case 1: fallosData.atendidos.push(fallo); break;
-                case 2: fallosData.cancelados.push(fallo); break;
-            }
-
-            // Contabilizar fallos por día
-            if (!fallosPorDia[fechaReporte]) fallosPorDia[fechaReporte] = 0;
-            fallosPorDia[fechaReporte]++;
-
-            // Registrar tiempos de respuesta
-            tiempoRespuesta.push(horasResolucion);
-        });
-
-        fallosData.fallosPorDia = fallosPorDia;
-        fallosData.tiempoRespuesta = tiempoRespuesta;
-    }
-
-    // Actualizar gráficos
-    function actualizarGraficos() {
-        // Actualizar Pie Chart
-        estadosChart.data.datasets[0].data = [
-            fallosData.pendientes.length,
-            fallosData.atendidos.length,
-            fallosData.cancelados.length
-        ];
-        estadosChart.update();
-
-        // Actualizar Line Chart (Fallos por Día)
-        const dias = Object.keys(fallosData.fallosPorDia);
-        const fallosPorDia = Object.values(fallosData.fallosPorDia);
-        fallosDiaChart.data.labels = dias;
-        fallosDiaChart.data.datasets[0].data = fallosPorDia;
-        fallosDiaChart.update();
-
-        // Actualizar Bar Chart (Tiempo de Respuesta)
-        const promedioRespuesta = fallosData.tiempoRespuesta.length
-            ? (fallosData.tiempoRespuesta.reduce((a, b) => a + b) / fallosData.tiempoRespuesta.length).toFixed(2)
-            : 0;
-        tiempoRespuestaChart.data.labels = ['Promedio'];
-        tiempoRespuestaChart.data.datasets[0].data = [promedioRespuesta];
-        tiempoRespuestaChart.update();
-    }
-    
-    function formatFecha(fecha) {
-        const opciones = { year: 'numeric', month: 'long', day: 'numeric' };
-        return new Date(fecha).toLocaleDateString('es-MX', opciones);
-    }
-
-    fallosDiaChart.data.labels = Object.keys(fallosPorDia).map(formatFecha);
-
-    // Actualizar dashboard con datos del API
-    async function actualizarDashboard() {
-        try {
-            const response = await fetch('/fallas/GetFallos');
-            const fallos = await response.json();
-
-            // Procesar y guardar datos
-            procesarFallos(fallos);
-
-            // Actualizar contadores
-            document.getElementById('fallosPendientes').textContent = fallosData.pendientes.length;
-            document.getElementById('fallosAtendidos').textContent = fallosData.atendidos.length;
-            document.getElementById('fallosCancelados').textContent = fallosData.cancelados.length;
-
-            // Actualizar gráficos
-            actualizarGraficos();
-        } catch (error) {
-            console.error('Error al actualizar dashboard:', error);
+            });
         }
-    }
+            // Gráfico de Fallos por Día (Line Chart)
+            const fallosDiaCtx = document.getElementById('fallosPorDiaChart').getContext('2d');
+            fallosDiaChart = new Chart(fallosDiaCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Fallos Reportados',
+                        data: [],
+                        borderColor: '#007bff',
+                        fill: false
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
 
-    // Conexión SignalR para actualizar en tiempo real
-    connection.on("NuevoFalloReportado", () => actualizarDashboard());
-    connection.on("FalloActualizado", () => actualizarDashboard());
+            // Gráfico de Tiempo de Respuesta (Line Chart)
+            const tiempoRespuestaCtx = document.getElementById('tiempoPromedioRespuesta').getContext('2d');
+            tiempoRespuestaChart = new Chart(tiempoRespuestaCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Tiempo Promedio (minutos)',
+                        data: [],
+                        borderColor: '#17a2b8',
+                        fill: false
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }, plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(tooltipItem) {
+                                return `${tooltipItem.label}: ${tooltipItem.raw} minutos`;
+                            }
+                        }
+                    }
+                }
+            });
 
-    // Inicialización del dashboard
-    document.addEventListener('DOMContentLoaded', async () => {
-        await connection.start();
-        initCharts();
-        await actualizarDashboard();
-    });
+        // Actualizar dashboard con datos del API
+        async function actualizarDashboard() {
+            try {
+                // Obtener datos de estados
+                const estadosResponse = await fetch('/Fallas/Estadisticas/Estados');
+                const estadosData = await estadosResponse.json();
+                // Actualizar gráfico de estados
+                estadosChart.data.datasets[0].data = [
+                    estadosData['Pendiente'] || 0,
+                    estadosData['Atendida'] || 0,
+                    estadosData['Cancelada'] || 0
+                ];
+                estadosChart.update();
+
+                // Actualizar contadores
+                document.getElementById('fallosPendientes').textContent = estadosData['Pendiente'] || 0;
+                document.getElementById('fallosAtendidos').textContent = estadosData['Atendida'] || 0;
+                document.getElementById('fallosCancelados').textContent = estadosData['Cancelada'] || 0;
+
+                // Obtener datos de fallos por día
+                const fallosPorDiaResponse = await fetch('/Fallas/Estadisticas/FallosPorDia');
+                const fallosPorDiaData = await fallosPorDiaResponse.json();
+
+                // Actualizar gráfico de fallos por día
+                if (fallosPorDiaData) {
+                    // Actualizar gráfico de fallos por día
+                    const fechas = Object.keys(fallosPorDiaData);
+                    const cantidades = Object.values(fallosPorDiaData);
+                    fallosDiaChart.data.labels = fechas.map(formatFecha);
+                    fallosDiaChart.data.datasets[0].data = cantidades;
+                    fallosDiaChart.update();
+                }
+
+                // Obtener datos de tiempo promedio de respuesta por día
+                const tiempoPromedioResponse = await fetch('/Fallas/Estadisticas/TiempoPromedioRespuesta');
+                const tiempoPromedioData = await tiempoPromedioResponse.json();
+                if (tiempoPromedioData) {
+                    // Actualizar gráfico de tiempo promedio de respuesta por día
+                    const fechas = Object.keys(tiempoPromedioData.tiempoPromedio);
+                    const tiemposPromedio = Object.values(tiempoPromedioData.tiempoPromedio);
+                    tiempoRespuestaChart.data.labels = fechas.map(formatFecha);
+                    tiempoRespuestaChart.data.datasets[0].data = tiemposPromedio;
+                    tiempoRespuestaChart.update();
+                }
+
+            } catch (error) {
+                console.error('Error al actualizar dashboard:', error);
+            }
+        }
+
+        function formatFecha(fecha) {
+            const opciones = { year: 'numeric', month: 'long', day: 'numeric' };
+            return new Date(fecha).toLocaleDateString('es-MX', opciones);
+        }
     </script>
-
 }

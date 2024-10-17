@@ -12,44 +12,31 @@ namespace RaccoonMobile.Services
         public FalloServicio()
         {
             this.fallos = new List<Fallo>();
-            fallos.Add(new Fallo
+            var random = new Random();
+            var estados = new[] { Estado.Pendiente, Estado.Atendida, Estado.Cancelada };
+            var dispositivos = new[] { "Laptop", "Impresora", "Servidor", "Router", "Smartphone" };
+            var tiposRed = new[] { "3G", "4G", "5G", "WiFi" };
+
+            for (int i = 0; i < 20; i++)
             {
-                id = 1,
-                usuario = "Juan Pérez",
-                descripcion = "Problema con la conexión a internet",
-                dispositivo = "Laptop",
-                tipoRed = "4G",
-                PosicionLatitud = 19.4326,
-                PosicionLongitud = -99.1332,
-                estado = Estado.Pendiente,
-                fechaReporte = DateTime.Now
-            });
-            fallos.Add(new Fallo
-            {
-                id = 2,
-                usuario = "María López",
-                descripcion = "Problema con la impresora",
-                dispositivo = "Impresora",
-                tipoRed = "5G",
-                PosicionLatitud = 19.4326,
-                PosicionLongitud = -99.1332,
-                estado = Estado.Atendida,
-                fechaReporte = DateTime.Now.AddDays(-1),
-                fechaResolucion = DateTime.Now
-            });
-            fallos.Add(new Fallo
-            {
-                id = 3,
-                usuario = "Pedro Ramírez",
-                descripcion = "Problema con el servidor",
-                dispositivo = "Servidor",
-                tipoRed = "3G",
-                PosicionLatitud = 19.4326,
-                PosicionLongitud = -99.1332,
-                estado = Estado.Cancelada,
-                fechaReporte = DateTime.Now.AddDays(-2),
-                fechaResolucion = DateTime.Now
-            });
+                var fechaReporte = DateTime.Now.AddDays(-random.Next(0, 365));
+                var fechaResolucion = fechaReporte.AddHours(random.Next(1, 72));
+                var estado = estados[random.Next(estados.Length)];
+
+                fallos.Add(new Fallo
+                {
+                    id = i + 1,
+                    usuario = $"Usuario {i + 1}",
+                    descripcion = $"Problema {i + 1}",
+                    dispositivo = dispositivos[random.Next(dispositivos.Length)],
+                    tipoRed = tiposRed[random.Next(tiposRed.Length)],
+                    PosicionLatitud = 19.4326 + random.NextDouble() * 0.1,
+                    PosicionLongitud = -99.1332 + random.NextDouble() * 0.1,
+                    estado = estado,
+                    fechaReporte = fechaReporte,
+                    fechaResolucion = estado == Estado.Pendiente ? DateTime.MinValue : fechaResolucion
+                });
+            }
         }
 
         public List<Fallo> ObtenerFallos()
@@ -127,14 +114,17 @@ namespace RaccoonMobile.Services
         }
 
         // Método para calcular el tiempo de respuesta promedio en horas
-        public double CalcularTiempoPromedioRespuesta()
+        public Dictionary<string, double> CalcularTiempoPromedioRespuestaPorDia()
         {
-            var tiempos = fallos
+            var tiemposPorDia = fallos
                 .Where(f => f.fechaResolucion != DateTime.MinValue)
-                .Select(f => (f.fechaResolucion - f.fechaReporte).TotalHours)
-                .ToList();
+                .GroupBy(f => f.fechaReporte.Date)
+                .ToDictionary(
+                    g => g.Key.ToString("yyyy-MM-dd"),
+                    g => g.Average(f => (f.fechaResolucion - f.fechaReporte).TotalMinutes)
+                );
 
-            return tiempos.Any() ? tiempos.Average() : 0;
+            return tiemposPorDia;
         }
     }
 }

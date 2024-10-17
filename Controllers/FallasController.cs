@@ -123,7 +123,7 @@ namespace RaccoonMobile.Controllers
         [Route("Estadisticas/TiempoPromedioRespuesta")]
         public IActionResult GetTiempoPromedioRespuesta()
         {
-            var tiempoPromedio = _fallosDeServicio.CalcularTiempoPromedioRespuesta();
+            var tiempoPromedio = _fallosDeServicio.CalcularTiempoPromedioRespuestaPorDia();
             return Json(new { tiempoPromedio });
         }
     }

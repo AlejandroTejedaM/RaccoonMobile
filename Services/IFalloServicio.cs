@@ -14,6 +14,6 @@ namespace RaccoonMobile.Services
         // Métodos agregados para estadísticas
         Dictionary<string, int> ObtenerFallosPorEstado();
         Dictionary<string, int> ObtenerFallosPorDia();
-        double CalcularTiempoPromedioRespuesta();
+        Dictionary<string, double> CalcularTiempoPromedioRespuestaPorDia();
     }
 }
