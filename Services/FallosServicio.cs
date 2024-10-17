@@ -27,6 +27,10 @@ namespace RaccoonMobile.Services
                 existingFallo.PosicionLongitud = fallo.PosicionLongitud;
                 existingFallo.estado = fallo.estado;
                 existingFallo.fechaReporte = fallo.fechaReporte;
+
+                existingFallo.fechaResolucion = DateTime.Now;
+
+
                 return true;
             }
             return false;
