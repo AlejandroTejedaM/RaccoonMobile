@@ -16,18 +16,20 @@ namespace RaccoonMobile.Services
         }
         public bool ActualizarFallo(Fallo fallo)
         {
-            Fallo? falloActual = fallos.FirstOrDefault(f => f.id == fallo.id);
-            if (falloActual != null)
+            var existingFallo = fallos.FirstOrDefault(f => f.id == fallo.id);
+            if (existingFallo != null)
             {
-                falloActual = fallo;
-                fallos.Remove(falloActual);
-                fallos.Add(fallo);
+                existingFallo.usuario = fallo.usuario;
+                existingFallo.descripcion = fallo.descripcion;
+                existingFallo.dispositivo = fallo.dispositivo;
+                existingFallo.tipoRed = fallo.tipoRed;
+                existingFallo.PosicionLatitud = fallo.PosicionLatitud;
+                existingFallo.PosicionLongitud = fallo.PosicionLongitud;
+                existingFallo.estado = fallo.estado;
+                existingFallo.fechaReporte = fallo.fechaReporte;
                 return true;
             }
-            else
-            {
-                return false;
-            }
+            return false;
         }
 
         public bool EliminarFallo(int id)
@@ -41,16 +43,9 @@ namespace RaccoonMobile.Services
             return false;
         }
 
-        public Fallo? ObtenerFallo(int id)
+        public Fallo ObtenerFallo(int id)
         {
-            if (fallos.Count > 0)
-            {
-                return fallos.FirstOrDefault(f => f.id == id);
-            }
-            else
-            {
-                return null;
-            }
+            return fallos.FirstOrDefault(f => f.id == id);
         }
 
         public List<Fallo> ObtenerFallos()
