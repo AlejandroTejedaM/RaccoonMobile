@@ -17,7 +17,8 @@
                 <th>Descripción</th>
                 <th>Ubicación</th>
                 <th>Fecha de Reporte</th>
-                <th>Fecha de Resolución</th> <!-- Nueva columna -->
+                <th>Fecha de Resolución</th>
+                <th>Tiempo Transcurrido</th> <!-- Modificado para incluir tiempo transcurrido -->
                 <th>Estado</th>
                 <th>Acciones</th>
             </tr>
@@ -26,7 +27,6 @@
             <!-- Aquí se generarán las filas dinámicamente -->
         </tbody>
     </table>
-
 
     <!-- Modal para ver detalles de la notificación -->
     <div class="modal fade" id="notificationDetailsModal" tabindex="-1" aria-labelledby="exampleModalLabel"
@@ -81,20 +81,26 @@
                 fallosFiltrados = fallos.filter(fallo => fallo.estado === 1);
 
                 if (fallosFiltrados.length === 0) {
-                    tableBody.innerHTML = `<tr><td colspan="6" class="text-center">No hay fallos finalizados.</td></tr>`;
+                    tableBody.innerHTML = `<tr><td colspan="8" class="text-center">No hay fallos finalizados.</td></tr>`;
                     return;
                 }
 
                 fallosFiltrados.forEach((fallo, index) => {
                     const ubicacion = `Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}`;
-                    const fechaResolucion = fallo.fechaResolucion ? new Date(fallo.fechaResolucion).toLocaleDateString() : 'Pendiente'; // Mostrar 'Pendiente' si no hay fecha
+                    const fechaReporte = new Date(fallo.fechaReporte);
+                    const fechaResolucion = fallo.fechaResolucion ? new Date(fallo.fechaResolucion) : 'Pendiente'; // Mostrar 'Pendiente' si no hay fecha
+                    const tiempoTranscurrido = calcularTiempoTranscurrido(fechaReporte); // Calcular tiempo transcurrido
+                    const fechaReporteFormateada = `${fechaReporte.toLocaleDateString()} ${fechaReporte.toLocaleTimeString()}`;
+                    const fechaResolucionFormateada = fechaResolucion instanceof Date ? `${fechaResolucion.toLocaleDateString()} ${fechaResolucion.toLocaleTimeString()}` : 'Pendiente';
+
                     const row = `
                         <tr>
                             <td>${fallo.usuario}</td>
                             <td>${fallo.descripcion}</td>
                             <td>${ubicacion}</td>
-                            <td>${new Date(fallo.fechaReporte).toLocaleDateString()}</td>
-                            <td>${fechaResolucion}</td> <!-- Mostrar la fecha de resolución -->
+                            <td>${fechaReporteFormateada}</td>
+                            <td>${fechaResolucionFormateada}</td>
+                            <td>${tiempoTranscurrido}</td> <!-- Mostrar tiempo transcurrido -->
                             <td>Finalizado</td>
                             <td>
                                 <button class="btn btn-info btn-sm" onclick="verDetalles(${index})">Ver Detalles</button>
@@ -109,13 +115,26 @@
             }
         }
 
+        // Función para calcular el tiempo transcurrido en días, horas, minutos y segundos
+        function calcularTiempoTranscurrido(fechaReporte) {
+            const ahora = new Date();
+            const diferencia = Math.floor((ahora - fechaReporte) / 1000); // Diferencia en segundos
+            const dias = Math.floor(diferencia / (24 * 3600));
+            const horas = Math.floor((diferencia % (24 * 3600)) / 3600);
+            const minutos = Math.floor((diferencia % 3600) / 60);
+            const segundos = diferencia % 60;
+
+            return `${dias}d ${horas}h ${minutos}m ${segundos}s`;
+        }
+
         // Función para ver los detalles del fallo en el modal
         function verDetalles(index) {
             const fallo = fallosFiltrados[index];
+            const fechaReporte = new Date(fallo.fechaReporte);
             document.getElementById('modalUsuario').textContent = fallo.usuario;
             document.getElementById('modalDescripcion').textContent = fallo.descripcion;
             document.getElementById('modalUbicacion').textContent = `Lat: ${fallo.posicionLatitud.toFixed(6)}, Lon: ${fallo.posicionLongitud.toFixed(6)}`;
-            document.getElementById('modalFechaReporte').textContent = new Date(fallo.fechaReporte).toLocaleDateString();
+            document.getElementById('modalFechaReporte').textContent = `${fechaReporte.toLocaleDateString()} ${fechaReporte.toLocaleTimeString()}`;
             document.getElementById('modalEstado').textContent = 'Finalizado';
         }
 
