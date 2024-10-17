@@ -97,9 +97,34 @@ namespace RaccoonMobile.Controllers
                 return Json(new { message = "Fallo no encontrado" });
             }
         }
+
         public IActionResult User()
         {
             return View();
+        }
+
+        [HttpGet]
+        [Route("Estadisticas/Estados")]
+        public IActionResult GetEstadisticasEstados()
+        {
+            var estadisticas = _fallosDeServicio.ObtenerFallosPorEstado();
+            return Json(estadisticas);
+        }
+
+        [HttpGet]
+        [Route("Estadisticas/FallosPorDia")]
+        public IActionResult GetFallosPorDia()
+        {
+            var fallosPorDia = _fallosDeServicio.ObtenerFallosPorDia();
+            return Json(fallosPorDia);
+        }
+
+        [HttpGet]
+        [Route("Estadisticas/TiempoPromedioRespuesta")]
+        public IActionResult GetTiempoPromedioRespuesta()
+        {
+            var tiempoPromedio = _fallosDeServicio.CalcularTiempoPromedioRespuesta();
+            return Json(new { tiempoPromedio });
         }
     }
 }

@@ -9,4 +9,10 @@ public class LogisticaController : Controller
     {
         return View();
     }
+    
+    // GET
+    public IActionResult Dashboard()
+    {
+        return View();
+    }
 }
