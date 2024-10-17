@@ -70,6 +70,10 @@
             cargarFallos();
         });
 
+        connection.on("FalloActualizado", () => {
+            cargarFallos();
+        });
+
         // Función para cargar fallos desde el controlador
         async function cargarFallos() {
             try {
@@ -94,19 +98,19 @@
                     const fechaResolucionFormateada = fechaResolucion instanceof Date ? `${fechaResolucion.toLocaleDateString()} ${fechaResolucion.toLocaleTimeString()}` : 'Pendiente';
 
                     const row = `
-                        <tr>
-                            <td>${fallo.usuario}</td>
-                            <td>${fallo.descripcion}</td>
-                            <td>${ubicacion}</td>
-                            <td>${fechaReporteFormateada}</td>
-                            <td>${fechaResolucionFormateada}</td>
-                            <td>${tiempoTranscurrido}</td> <!-- Mostrar tiempo transcurrido -->
-                            <td>Finalizado</td>
-                            <td>
-                                <button class="btn btn-info btn-sm" onclick="verDetalles(${index})">Ver Detalles</button>
-                            </td>
-                        </tr>
-                    `;
+                            <tr>
+                                <td>${fallo.usuario}</td>
+                                <td>${fallo.descripcion}</td>
+                                <td>${ubicacion}</td>
+                                <td>${fechaReporteFormateada}</td>
+                                <td>${fechaResolucionFormateada}</td>
+                                <td>${tiempoTranscurrido}</td> <!-- Mostrar tiempo transcurrido -->
+                                <td>Finalizado</td>
+                                <td>
+                                    <button class="btn btn-info btn-sm" onclick="verDetalles(${index})">Ver Detalles</button>
+                                </td>
+                            </tr>
+                        `;
                     tableBody.innerHTML += row;
                 });
 
@@ -167,6 +171,6 @@
         });
 
         // Cargar fallos al cargar la página
-        window.onload = cargarFallos;
+        window.onload = cargarFallos();
     </script>
 }
