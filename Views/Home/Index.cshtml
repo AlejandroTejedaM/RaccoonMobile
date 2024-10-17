@@ -1,6 +1,20 @@
 ﻿@{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "Inicio";
 }
 
-<h1>Welcome to RaccoonMobile!</h1>
-<p>This is the home page.</p>
+<div class="text-center mt-4">
+    <h1 class="display-4">Bienvenido a Raccoon Mobile</h1>
+    <p class="lead">Servicio de seguimiento a líneas telefónicas</p>
+    
+    <div class="row justify-content-center mt-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Reportar Fallo</h5>
+                    <p class="card-text">Si tienes problemas con tu línea, repórtalo aquí</p>
+<a href="@Url.Action("user", "Fallas")" class="btn btn-primary">Reportar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
